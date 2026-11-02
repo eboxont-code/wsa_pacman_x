@@ -16,7 +16,7 @@ class WSAUtils {
     // Starting an Android app should leave PacMan quietly available in the tray.
     // Keep temporary APK-installer windows' existing close behavior unchanged.
     if (launched && isDesktop && !Constants.installMode) {
-      appWindow.hide();
+      appWindow.minimize();
     }
     return launched;
   }
