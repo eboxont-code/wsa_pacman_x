@@ -546,15 +546,16 @@ function Install-WsaFromFolder([string]$Folder) {
 
     # Never let the upstream error-recovery path uninstall an existing package.
     $preservePattern = '(?ims)^ElseIf\s*\(\s*\$null\s*-Ne\s*\$Installed\s*\)\s*\{.*?^\}'
-    if ([regex]::IsMatch($sourceText, $preservePattern)) {
-        $preserveReplacement = 'ElseIf ($null -Ne $Installed) {' + [Environment]::NewLine +
-            "    throw 'WSA registration failed while an existing package is present. PacMan will not uninstall or replace it.'" + [Environment]::NewLine + '}'
-        $preserveEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
-            param($match)
-            return $preserveReplacement
-        }
-        $sourceText = [regex]::Replace($sourceText, $preservePattern, $preserveEvaluator)
+    if (-not [regex]::IsMatch($sourceText, $preservePattern)) {
+        throw 'The upstream installer no longer has the expected existing-package recovery path. Refusing an unattended install until that path can be reviewed.'
     }
+    $preserveReplacement = 'ElseIf ($null -Ne $Installed) {' + [Environment]::NewLine +
+        "    throw 'WSA registration failed while an existing package is present. PacMan will not uninstall or replace it.'" + [Environment]::NewLine + '}'
+    $preserveEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $preserveReplacement
+    }
+    $sourceText = [regex]::Replace($sourceText, $preservePattern, $preserveEvaluator)
 
     # The outer PacMan helper is already elevated. Keep even an unexpected
     # upstream self-elevation or conhost fallback hidden.
