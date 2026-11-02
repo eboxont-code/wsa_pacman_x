@@ -2,6 +2,7 @@
 #define RUNNER_WIN32_WINDOW_H_
 
 #include <windows.h>
+#include <shellapi.h>
 
 #include <functional>
 #include <memory>
@@ -32,11 +33,8 @@ class Win32Window {
   void SetChildContent(HWND content);
   HWND GetHandle();
 
-  // Closing the window normally hides it in the notification area. Explicit
-  // application termination is provided by the tray menu's Exit command.
   void SetQuitOnClose(bool quit_on_close);
   void ExitApplication();
-
   RECT GetClientArea();
 
  protected:
