@@ -481,7 +481,9 @@ function Install-WsaFromFolder([string]$Folder) {
     Write-Info "Starting the upstream WSA installer from $workingDirectory"
     Write-WarningMessage 'Do not close the installer window while WSA is being registered.'
 
-    $argumentLine = '/d /c "' + $runBatch.FullName + '"'
+    # WSABuilds leaves its PowerShell window on a final "press any key" pause.
+    # Redirect stdin from NUL so that non-interactive completion does not block.
+    $argumentLine = '/d /c call "' + $runBatch.FullName + '" < nul'
     $process = Start-Process -FilePath $env:ComSpec -ArgumentList $argumentLine -WorkingDirectory $workingDirectory -Wait -PassThru
 
     if ($process.ExitCode -ne 0) {
