@@ -175,8 +175,12 @@ Win32Window::MessageHandler(HWND hwnd,
                             LPARAM const lparam) noexcept {
   if (taskbar_created_message_ != 0 && message == taskbar_created_message_) {
     tray_icon_added_ = false;
-    if (close_to_tray_) {
-      AddTrayIcon();
+    if (close_to_tray_ && !AddTrayIcon()) {
+      // Explorer may be restarting. If the icon cannot be restored, keep the
+      // manager visible so the user never loses access to the running process.
+      close_to_tray_ = false;
+      ShowWindow(hwnd, SW_SHOW);
+      OutputDebugStringW(L"WSA PacMan: notification-area icon could not be restored.\\n");
     }
     return 0;
   }
@@ -360,7 +364,9 @@ void Win32Window::ShowFromTray() {
     return;
   }
 
-  ShowWindow(window_handle_, SW_RESTORE);
+  // Restore a minimized window, but use SW_SHOW for a window hidden
+  // from the red X so an already-maximized window remains maximized.
+  ShowWindow(window_handle_, IsIconic(window_handle_) ? SW_RESTORE : SW_SHOW);
   SetForegroundWindow(window_handle_);
 }
 
