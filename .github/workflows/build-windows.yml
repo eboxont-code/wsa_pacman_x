@@ -167,7 +167,9 @@ jobs:
             "SC_CLOSE",
             "SIZE_MINIMIZED",
             "Exit WSA PacMan",
-            "Open WSA PacMan"
+            "Open WSA PacMan",
+            "IsIconic(window_handle_)",
+            "notification-area icon could not be restored"
           )
           foreach ($check in $trayChecks) {
             if ($traySource -notmatch [regex]::Escape($check)) {
