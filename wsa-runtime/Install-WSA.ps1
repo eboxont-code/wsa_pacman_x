@@ -158,7 +158,40 @@ function Confirm-WsaPrerequisites($Target) {
 
     $versionKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
     $currentBuild = Get-ItemProperty -Path $versionKey
-    Write-Info "Windows version: $($currentBuild.ProductName), build $($currentBuild.CurrentBuildNumber).$($currentBuild.UBR)"
+    $buildNumber = [int]$currentBuild.CurrentBuildNumber
+    $revision = [int]$currentBuild.UBR
+    $edition = [string]$currentBuild.EditionID
+    $displayVersion = [string]$currentBuild.DisplayVersion
+
+    # ProductName can retain a Windows 10 label on newer Windows 11 installations.
+    # Use the build family for the displayed OS version instead.
+    if ($buildNumber -ge 28000) {
+        $windowsLabel = 'Windows 11 26H1'
+    }
+    elseif ($buildNumber -ge 26300) {
+        $windowsLabel = 'Windows 11 26H2'
+    }
+    elseif ($buildNumber -ge 26200) {
+        $windowsLabel = 'Windows 11 25H2'
+    }
+    elseif ($buildNumber -ge 26100) {
+        $windowsLabel = 'Windows 11 24H2'
+    }
+    elseif ($buildNumber -ge 22631) {
+        $windowsLabel = 'Windows 11 23H2'
+    }
+    elseif ($buildNumber -ge 22000) {
+        $windowsLabel = 'Windows 11'
+    }
+    elseif ($buildNumber -ge 19045) {
+        $windowsLabel = 'Windows 10 22H2'
+    }
+    else {
+        $windowsLabel = [string]$currentBuild.ProductName
+    }
+
+    $versionSuffix = if ($displayVersion) { ", version $displayVersion" } else { '' }
+    Write-Info ("Windows version: {0}{1}, build {2}.{3}; edition: {4}" -f $windowsLabel, $versionSuffix, $buildNumber, $revision, $edition)
     Write-Info "Native CPU architecture: $($Target.Architecture) (supported)"
 
     $systemDrive = [IO.Path]::GetPathRoot($env:SystemRoot)
@@ -184,22 +217,36 @@ function Confirm-WsaPrerequisites($Target) {
 
     $processor = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
     $firmwareVirtualizationEnabled = $processor.VirtualizationFirmwareEnabled
+    $vmMonitorExtensions = $processor.VMMonitorModeExtensions
+    $slatExtensions = $processor.SecondLevelAddressTranslationExtensions
     $hypervisorPresent = $computer.HypervisorPresent -eq $true
 
-    if ($firmwareVirtualizationEnabled -eq $false) {
-        throw 'Hardware virtualization is reported as disabled in BIOS/UEFI. A Windows script cannot safely change firmware settings. Enable Intel VT-x / Intel Virtualization Technology or AMD-V / SVM Mode in BIOS/UEFI, save, restart Windows, and run this setup again.'
+    Write-Info "Processor: $($processor.Name)"
+    Write-Info ("Virtualization diagnostics: firmware flag={0}; VM monitor extensions={1}; SLAT={2}; Windows hypervisor active={3}" -f $firmwareVirtualizationEnabled, $vmMonitorExtensions, $slatExtensions, $hypervisorPresent)
+
+    if ($hypervisorPresent) {
+        # An active Windows hypervisor confirms that firmware virtualization is usable.
+        Write-Info 'Hardware virtualization: Windows hypervisor is already active (passed)'
     }
     elseif ($firmwareVirtualizationEnabled -eq $true) {
         Write-Info 'Hardware virtualization: enabled in firmware (passed)'
     }
-    elseif ($hypervisorPresent) {
-        Write-Info 'The Windows hypervisor is already active; firmware virtualization is available.'
+    elseif ($firmwareVirtualizationEnabled -eq $false) {
+        Write-WarningMessage 'The WMI firmware flag says virtualization is disabled. This can be inaccurate on some firmware/Windows combinations.'
+        if (Read-Confirmation 'Open Task Manager > Performance > CPU. Does it show Virtualization: Enabled? Choose Y only when you can see Enabled.') {
+            Write-Info 'Hardware virtualization manually confirmed as Enabled in Task Manager. Continuing with Windows feature checks.'
+        }
+        else {
+            throw 'Hardware virtualization still appears to be disabled. Windows cannot safely switch Intel VT-x / AMD-V / SVM in BIOS/UEFI. Enable it using Settings > System > Recovery > Advanced startup > Restart now > Troubleshoot > Advanced options > UEFI Firmware Settings, then enable Intel Virtualization Technology (VT-x/VMX) or AMD SVM Mode and save changes. Do not change unrelated firmware settings.'
+        }
     }
     else {
-        Write-WarningMessage 'Windows could not verify the firmware virtualization flag on this processor.'
-        if (-not (Read-Confirmation 'Open Task Manager > Performance > CPU and confirm that Virtualization says Enabled. Continue anyway?')) {
-            Write-Info 'Cancelled. No Windows features were changed.'
-            exit 0
+        Write-WarningMessage 'Windows could not read the firmware virtualization flag.'
+        if (Read-Confirmation 'Open Task Manager > Performance > CPU. Does it show Virtualization: Enabled? Choose Y only when you can see Enabled.') {
+            Write-Info 'Hardware virtualization manually confirmed as Enabled in Task Manager. Continuing with Windows feature checks.'
+        }
+        else {
+            throw 'Could not confirm hardware virtualization. Check Task Manager > Performance > CPU; enable virtualization in BIOS/UEFI if it says Disabled.'
         }
     }
 

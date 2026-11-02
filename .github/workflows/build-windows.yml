@@ -6,6 +6,7 @@ on:
       - custom/white-ui
       - wsa/auto-architecture-runtime
       - wsa/auto-prerequisite-repair
+      - wsa/virtualization-diagnostics
   pull_request:
     branches:
       - main
@@ -42,7 +43,7 @@ jobs:
           $scriptText = Get-Content "wsa-runtime/Install-WSA.ps1" -Raw
           $tokens = $null
           $parseErrors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseInput(
+          $ast = [System.Management.Automation.Language.Parser]::ParseInput(
             $scriptText, [ref]$tokens, [ref]$parseErrors
           )
           if ($parseErrors.Count -gt 0) {
@@ -50,9 +51,34 @@ jobs:
             throw "WSA runtime setup script contains PowerShell syntax errors"
           }
 
+          # Catch missing function definitions as well as parser-level syntax errors.
+          $definedFunctions = @(
+            $ast.FindAll({
+              param($node)
+              $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
+            }, $true) | ForEach-Object { $_.Name }
+          )
+          $requiredFunctions = @(
+            "Get-WindowsTarget",
+            "Get-ExistingWsaPackage",
+            "Confirm-WsaPrerequisites",
+            "Get-LatestMatchingWsaAsset",
+            "Install-WsaFromFolder"
+          )
+          foreach ($functionName in $requiredFunctions) {
+            if ($definedFunctions -notcontains $functionName) {
+              throw "Required runtime function is not defined: $functionName"
+            }
+          }
+
           $requiredChecks = @(
             "Get-NativeArchitecture",
             "VirtualizationFirmwareEnabled",
+            "VMMonitorModeExtensions",
+            "SecondLevelAddressTranslationExtensions",
+            "HypervisorPresent",
+            "Windows 11 26H2",
+            "Task Manager > Performance > CPU",
             "VirtualMachinePlatform",
             "HypervisorPlatform",
             "Get-WindowsOptionalFeature",
