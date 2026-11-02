@@ -43,6 +43,7 @@ OutputDir={#instbuilddir}
 [Tasks]
 Name: fileassoc_apk; Description: "{cm:AssocFileExtension,{#app_name},.apk}";
 Name: fileassoc_xapk; Description: "{cm:AssocFileExtension,{#app_name},.xapk}";
+Name: install_wsa_runtime; Description: "Download and install the matching WSA Android runtime (about 475–555 MB)"; Flags: unchecked;
 
 [Registry]
 Root: HKA; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "WSA_PACMAN_HOME"; ValueData: "{app}"; Flags: createvalueifdoesntexist preservestringtype uninsdeletevalue
@@ -71,9 +72,17 @@ Source: ".\redist\VC_redist.x64.exe"; DestDir: {tmp}; Flags: dontcopy
 [Run]
 Filename: "{tmp}\VC_redist.x64.exe"; StatusMsg: "Installing Visual C++ Redistributable..."; \
   Parameters: "/quiet /norestart /install"; Check: ShouldInstallVCRedist; Flags: waituntilterminated
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\wsa-runtime\Install-WSA.ps1"""; \
+  WorkingDir: "{app}\wsa-runtime"; Description: "Download and install the matching WSA Android runtime"; \
+  Flags: postinstall waituntilterminated skipifsilent; Tasks: install_wsa_runtime
 
 [Icons]
 Name: "{group}\WSA PacMan"; Filename: "{app}\{#executable}"
+Name: "{group}\Install matching WSA Android runtime"; \
+  Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\wsa-runtime\Install-WSA.ps1"""; \
+  WorkingDir: "{app}\wsa-runtime"; IconFilename: "{app}\{#executable}"
 
 [Code]
 function ShouldInstallVCRedist: Boolean;
