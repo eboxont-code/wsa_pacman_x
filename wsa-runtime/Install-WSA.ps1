@@ -356,6 +356,16 @@ try {
         exit 0
     }
 
+    $previousUserData = Join-Path $env:LOCALAPPDATA 'Packages\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe\LocalCache\userdata.vhdx'
+    if (Test-Path -LiteralPath $previousUserData) {
+        Write-WarningMessage 'A previous WSA Userdata.vhdx was found even though no WSA package is currently registered.'
+        Write-Host "Possible Android app data is stored here: $previousUserData"
+        Write-Host 'Copy this file to a safe backup location and move the original out of the WSA package folder before running a fresh install.'
+        Write-Info 'No download, extraction, installation or deletion was performed.'
+        Read-Host 'Press Enter to close'
+        exit 0
+    }
+
     Confirm-WsaPrerequisites -Target $target
 
     $computer = Get-CimInstance -ClassName Win32_ComputerSystem
