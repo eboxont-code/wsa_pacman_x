@@ -24,7 +24,6 @@ import 'package:wsa_pacman/windows/wsa_status.dart';
 import 'global_state.dart';
 
 import 'package:provider/provider.dart';
-import 'package:system_theme/system_theme.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart' as flutter_acrylic;
 import 'package:url_strategy/url_strategy.dart';
@@ -42,7 +41,6 @@ import 'theme.dart';
 const String appTitle = 'WSA Package Manager';
 const String appVersion = '1.5.0';
 
-late bool darkMode;
 
 class WSAStatusAlert {
   WSAStatusAlert(this.type, this.severity, this.title, this.desc);
@@ -214,7 +212,6 @@ void main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   const app = MyApp();
   final wrappedApp = SharedValue.wrapApp(app);
-  darkMode = SystemTheme.isDarkMode;
   runApp(wrappedApp);
 
   AppOptions.init();
@@ -223,7 +220,6 @@ void main(List<String> arguments) async {
   Constants.packageType = AppPackageType.fromArguments(arguments);
   Constants.isolate = Constants.installMode ? Constants.packageType.read(arguments.first) : null;
 
-  //await SystemTheme.accentInstance.load();
   await flutter_acrylic.Window.initialize();
 
   WSAPeriodicConnector._checkConnectionStatus();
@@ -273,21 +269,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = GState.theme.of(context).mode;
-    final mica = GState.mica.of(context);
+    // Keep the application in a clean, opaque white/light appearance.
+    const bool isDark = false;
+    setMicaEffect(false, false);
 
-    final bool isDark = theme == ThemeMode.system ? darkMode : theme == ThemeMode.dark;
-    setMicaEffect(mica.enabled, isDark);
-    final bool isMicaInstall = Constants.installMode && mica.enabled;
-    final bool IsFullMicaOrInstall = mica.full || isMicaInstall;
-    
     return ChangeNotifierProvider(
       create: (_) => AppTheme(),
       builder: (context, _) {
         final appTheme = context.watch<AppTheme>();
         return FluentApp(
           title: appTitle,
-          themeMode: theme,
+          themeMode: ThemeMode.light,
           debugShowCheckedModeBanner: false,
           initialRoute: '/',
           locale: GState.locale.of(context),
@@ -333,10 +325,10 @@ class MyApp extends StatelessWidget {
                 })
               ) ,
             ),
-            scaffoldBackgroundColor: IsFullMicaOrInstall ? Colors.transparent : isDark ? const Color(0xFF272727) : const Color(0xFFf9f9f9),
-            micaBackgroundColor: mica.enabled ? Colors.transparent : isDark ? const Color(0xFF202020) : const Color(0xFFf3f3f3),
-            accentColor: appTheme.getColor(isDark),
-            brightness: isDark ? Brightness.dark : Brightness.light,
+            scaffoldBackgroundColor: Colors.white,
+            micaBackgroundColor: Colors.white,
+            accentColor: appTheme.getColor(false),
+            brightness: Brightness.light,
             visualDensity: VisualDensity.standard,
             focusTheme: FocusThemeData(
               glowFactor: is10footScreen() ? 2.0 : 0.0,
@@ -383,7 +375,6 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     final lang = AppLocalizations.of(context)!;
     final appTheme = context.watch<AppTheme>();
-    final mica = GState.mica.of(context);
     final theme = FluentTheme.of(context);
 
     return NavigationView(
@@ -457,7 +448,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ThemablePaneItem(
             icon: const Icon(Mdi.androidDebugBridge),
             title: const Text('WSA'),
-            translucent: mica.enabled,
+            translucent: false,
             forceDisplayMode: appTheme.displayMode
           )
           /*PaneItem(
@@ -474,7 +465,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ThemablePaneItem(
             icon: const Icon(FluentIcons.settings),
             title: Text(lang.screen_settings),
-            translucent: mica.enabled,
+            translucent: false,
             forceDisplayMode: appTheme.displayMode
           ),
         ],
@@ -507,17 +498,14 @@ class WindowButtons extends StatelessWidget {
     assert(debugCheckHasFluentTheme(context));
     assert(debugCheckHasFluentLocalizations(context));
     final ThemeData theme = FluentTheme.of(context);
-    final mica = GState.mica.of(context);
 
     final buttonColors = WindowButtonColors(
       iconNormal: theme.inactiveColor,
       iconMouseDown: theme.inactiveColor,
       iconMouseOver: theme.inactiveColor,
       //Fixed button colors
-      mouseOver: mica.enabled ? windowButtonAlphaColor(theme, {ButtonStates.hovering}) : ButtonThemeData.buttonColor(
-          theme.brightness, {ButtonStates.hovering}).lerpWith(Colors.black, 0.12),
-      mouseDown: mica.enabled ? windowButtonAlphaColor(theme, {ButtonStates.pressing}) : ButtonThemeData.buttonColor(
-          theme.brightness, {ButtonStates.pressing}).lerpWith(theme.shadowColor, 0.12).withAlpha(150),
+      mouseOver: windowButtonAlphaColor(theme, {ButtonStates.hovering}),
+      mouseDown: windowButtonAlphaColor(theme, {ButtonStates.pressing}),
     );
     final closeButtonColors = WindowButtonColors(
       mouseOver: Colors.red,
