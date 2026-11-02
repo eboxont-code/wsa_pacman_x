@@ -6,6 +6,7 @@ on:
       - custom/white-ui
       - wsa/auto-architecture-runtime
       - wsa/auto-prerequisite-repair
+      - wsa/virtualization-diagnostics
   pull_request:
     branches:
       - main
@@ -53,6 +54,11 @@ jobs:
           $requiredChecks = @(
             "Get-NativeArchitecture",
             "VirtualizationFirmwareEnabled",
+            "VMMonitorModeExtensions",
+            "SecondLevelAddressTranslationExtensions",
+            "HypervisorPresent",
+            "Windows 11 26H2",
+            "Task Manager > Performance > CPU",
             "VirtualMachinePlatform",
             "HypervisorPlatform",
             "Get-WindowsOptionalFeature",
