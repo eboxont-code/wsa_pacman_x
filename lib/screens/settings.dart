@@ -15,20 +15,7 @@ import '/utils/string_utils.dart';
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 
-const List<String> accentColorNames = [
-  'System',
-  'Yellow',
-  'Orange',
-  'Red',
-  'Magenta',
-  'Purple',
-  'Blue',
-  'Teal',
-  'Green',
-];
-
 class LateUpdater<E> {
-  static const SETTINGS_UPDATE_TIMER = Duration(seconds:3);
   E initialValue;
   Timer? timer;
   Function(E value) callback;
@@ -74,38 +61,8 @@ class ScreenSettingsState extends State<ScreenSettings> {
     final locale_lang = GState.locale.of(context);
     final lang = AppLocalizations.of(context)!;
     
-    final tooltipThemeData = TooltipThemeData(decoration: () {
-      const radius = BorderRadius.zero;
-      final shadow = [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.2),
-          offset: const Offset(1, 1),
-          blurRadius: 10.0,
-        ),
-      ];
-      final border = Border.all(color: Colors.grey[100], width: 0.5);
-      if (theme.brightness == Brightness.light) {
-        return BoxDecoration(
-          color: Colors.white,
-          borderRadius: radius,
-          border: border,
-          boxShadow: shadow,
-        );
-      } else {
-        return BoxDecoration(
-          color: Colors.grey,
-          borderRadius: radius,
-          border: border,
-          boxShadow: shadow,
-        );
-      }
-    }());
-
-    const empty = SizedBox.shrink();
-    const hSpacer = SizedBox(width: 10.0);
     const smallSpacer = SizedBox(height: 5.0);
     const spacer = SizedBox(height: 10.0);
-    const biggerSpacer = SizedBox(height: 40.0);
 
     final autostartWSA = GState.autostartWSA.of(context);
     final installTimeout = GState.installTimeout.of(context);
