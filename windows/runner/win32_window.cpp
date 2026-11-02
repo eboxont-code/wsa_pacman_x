@@ -381,10 +381,20 @@ void Win32Window::ShowTrayMenu() {
   POINT cursor = {};
   GetCursorPos(&cursor);
   SetForegroundWindow(window_handle_);
-  TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_BOTTOMALIGN,
-                 cursor.x, cursor.y, 0, window_handle_, nullptr);
-  PostMessageW(window_handle_, WM_NULL, 0, 0);
+  const UINT selected_command = static_cast<UINT>(
+      TrackPopupMenu(menu,
+                     TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_BOTTOMALIGN |
+                         TPM_RETURNCMD,
+                     cursor.x, cursor.y, 0, window_handle_, nullptr));
   DestroyMenu(menu);
+
+  // Dispatch after TrackPopupMenu returns to avoid destroying the owner HWND
+  // while the native popup-menu loop is still active.
+  PostMessageW(window_handle_, WM_NULL, 0, 0);
+  if (selected_command != 0) {
+    PostMessageW(window_handle_, WM_COMMAND,
+                 MAKEWPARAM(selected_command, 0), 0);
+  }
 }
 
 bool Win32Window::OnCreate() {
