@@ -186,11 +186,14 @@ function Confirm-WsaPrerequisites($Target) {
     $firmwareVirtualizationEnabled = $processor.VirtualizationFirmwareEnabled
     $hypervisorPresent = $computer.HypervisorPresent -eq $true
 
-    if ($firmwareVirtualizationEnabled -eq $false -and -not $hypervisorPresent) {
+    if ($firmwareVirtualizationEnabled -eq $false) {
         throw 'Hardware virtualization is reported as disabled in BIOS/UEFI. A Windows script cannot safely change firmware settings. Enable Intel VT-x / Intel Virtualization Technology or AMD-V / SVM Mode in BIOS/UEFI, save, restart Windows, and run this setup again.'
     }
-    elseif ($firmwareVirtualizationEnabled -eq $true -or $hypervisorPresent) {
-        Write-Info 'Hardware virtualization: enabled (passed)'
+    elseif ($firmwareVirtualizationEnabled -eq $true) {
+        Write-Info 'Hardware virtualization: enabled in firmware (passed)'
+    }
+    elseif ($hypervisorPresent) {
+        Write-Info 'The Windows hypervisor is already active; firmware virtualization is available.'
     }
     else {
         Write-WarningMessage 'Windows could not verify the firmware virtualization flag on this processor.'
