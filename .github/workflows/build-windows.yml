@@ -7,6 +7,7 @@ on:
       - wsa/auto-architecture-runtime
       - wsa/auto-prerequisite-repair
       - wsa/virtualization-diagnostics
+      - wsa/automatic-runtime-resume
   pull_request:
     branches:
       - main
@@ -62,6 +63,8 @@ jobs:
             "Get-WindowsTarget",
             "Get-ExistingWsaPackage",
             "Confirm-WsaPrerequisites",
+            "Register-WsaResumeTask",
+            "Remove-WsaResumeTask",
             "Get-LatestMatchingWsaAsset",
             "Install-WsaFromFolder"
           )
@@ -79,6 +82,11 @@ jobs:
             "HypervisorPresent",
             "Windows 11 26H2",
             "Task Manager > Performance > CPU",
+            "New-ScheduledTaskTrigger",
+            "New-ScheduledTaskPrincipal",
+            "Register-ScheduledTask",
+            "ResumeAfterRestart",
+            "Automatic continuation",
             "VirtualMachinePlatform",
             "HypervisorPlatform",
             "Get-WindowsOptionalFeature",
@@ -92,6 +100,16 @@ jobs:
             if ($scriptText -notmatch [regex]::Escape($check)) {
               throw "Required WSA prerequisite/security check is missing: $check"
             }
+          }
+
+          if ($scriptText -match "Download, verify, extract and install this matching WSA package now") {
+            throw "The runtime installer must not add a redundant confirmation after its installer task has been selected"
+          }
+          if ($scriptText -match "Press Enter to close") {
+            throw "The runtime helper must not block automatic continuation with a console pause"
+          }
+          if ($scriptText -match "Then open Start > WSA PacMan") {
+            throw "The runtime helper must resume automatically after the prerequisite restart"
           }
 
           $installerText = Get-Content "installer/installer.iss" -Raw
