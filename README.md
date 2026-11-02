@@ -12,18 +12,23 @@ The app additionally provides a button to open Android settings and one to open 
 
 The Windows installer and portable package include the helper programs WSA PacMan uses (ADB, AAPT, AAPT2 and AXML decoding tools). The installer also carries the Microsoft Visual C++ x64 Redistributable and installs it automatically only when a suitable version is not already present. **You do not need to download Android platform-tools, ADB or the Visual C++ runtime separately.**
 
-**Windows Subsystem for Android (WSA) itself is a separate operating-system runtime and is not included.** WSA PacMan connects to an existing WSA installation; it does not download, replace or upgrade the Android system image. This avoids silently replacing an existing Android environment or risking its data. Install and start a compatible WSA distribution first, then launch WSA PacMan.
+The installer also includes an **Install matching WSA Android runtime** helper. It detects the PC's native architecture and Windows version, selects the matching current WSABuilds LTS package, verifies the published SHA-256 digest, extracts it and invokes the upstream installer. It can select Windows 11 x64, Windows 11 ARM64, or Windows 10 x64. You can run it at the end of PacMan setup with the optional checkbox, or later from the Start Menu.
+
+The default runtime choice is the upstream **NoGApps / NoAmazon** build. This omits Google Play Services/Store and Amazon Appstore; apps can still be installed with WSA PacMan by sideloading APKs. The WSABuilds project currently warns about crashes in Google Apps builds on Windows 11, so this helper avoids that variant by default. The WSA archive is downloaded directly from the upstream [WSABuilds releases](https://github.com/MustardChef/WSABuilds/releases), not re-hosted in this project. Expect a roughly 475–555 MB download, at least 10 GB free on the Windows system drive, NTFS storage, 8 GB RAM minimum, and virtualization enabled.
+
+**Existing WSA installations are detected and left untouched.** The helper will not uninstall, replace or convert an existing Android environment. Back up `Userdata.vhdx` before manually changing a WSA distribution or architecture. The extracted WSA folder must remain on the PC after installation; the upstream [installation guide](https://github.com/MustardChef/WSABuilds/blob/master/Documentation/WSABuilds/Installation.md) explains why.
+
+Microsoft ended official WSA support on 5 March 2025. These are community-maintained builds, not a Microsoft-supported Android subsystem. The latest available upstream LTS is still Android 13; this helper does not make Android 14/17 images available.
 
 ## Windows architecture compatibility
 
-The same Windows installer is designed for:
-
-- **Windows 10/11 on Intel or AMD x64 PCs**.
+The same PacMan installer is designed for:
+- **Windows 10/11 on Intel or AMD x64 PCs** (the WSA runtime helper supports Windows 10 22H2 build 19045.2311+ and Windows 11 build 22000.526+).
 - **Windows 11 on ARM64 PCs** (including Snapdragon systems), using Windows' built-in x64 app emulation.
 
-The application and bundled ADB/AAPT/AAPT2/AXML helper programs are x64 binaries, not native ARM64 binaries. Windows 11 on ARM can run them through its built-in x64 emulation; no separate emulator download is needed. This is an architecture-compatible universal installer, not a native ARM64 build. Windows 10 on ARM does not provide x64 emulation and is not supported by this package.
+The application and bundled ADB/AAPT/AAPT2/AXML helper programs are x64 binaries, not native ARM64 binaries. Windows 11 on ARM can run them through its built-in x64 emulation; no separate emulator download is needed. Windows 10 on ARM and 32-bit Windows are not supported by this package.
 
-The runtime helper picks the WSA distribution architecture to match the PC automatically. WSA itself remains architecture-specific: an x64 image cannot be installed on an ARM64 Windows host, or vice versa.
+The WSA helper selects an Android system image that matches the PC's native CPU architecture. An x64 WSA image cannot be installed on an ARM64 Windows host, or vice versa. If an existing WSA installation is present, the helper leaves it alone rather than risk user data.
 
 ## Settings
 
