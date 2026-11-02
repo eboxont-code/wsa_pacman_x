@@ -151,56 +151,134 @@ function Get-ExistingWsaPackage {
 }
 
 function Confirm-WsaPrerequisites($Target) {
+    $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
+    if ([int]$osInfo.ProductType -ne 1) {
+        throw 'The WSA runtime helper supports Windows 10/11 desktop editions only; Windows Server is not supported.'
+    }
+
+    $versionKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+    $currentBuild = Get-ItemProperty -Path $versionKey
+    Write-Info "Windows version: $($currentBuild.ProductName), build $($currentBuild.CurrentBuildNumber).$($currentBuild.UBR)"
+    Write-Info "Native CPU architecture: $($Target.Architecture) (supported)"
+
     $systemDrive = [IO.Path]::GetPathRoot($env:SystemRoot)
     $driveInfo = New-Object System.IO.DriveInfo($systemDrive)
 
     if ($driveInfo.DriveFormat -ne 'NTFS') {
-        throw "The Windows system drive ($systemDrive) must use NTFS for WSA."
+        throw "The Windows system drive ($systemDrive) uses $($driveInfo.DriveFormat). WSA requires NTFS. Free space alone will not fix this; do not convert or format the system drive as part of this setup."
     }
+    Write-Info "System drive file system: NTFS (passed)"
+
+    $freeSpaceGb = [math]::Round($driveInfo.AvailableFreeSpace / 1GB, 1)
     if ($driveInfo.AvailableFreeSpace -lt 10GB) {
-        throw 'WSA requires at least 10 GB free on the Windows system drive. Free space and run this setup again.'
+        throw "WSA requires at least 10 GB free on the Windows system drive. Only $freeSpaceGb GB is available. Free disk space and run this setup again."
     }
+    Write-Info "Free system-drive space: $freeSpaceGb GB (passed)"
 
     $computer = Get-CimInstance -ClassName Win32_ComputerSystem
     $memoryGb = [math]::Round($computer.TotalPhysicalMemory / 1GB, 1)
     if ($memoryGb -lt 8) {
-        Write-WarningMessage "This PC reports $memoryGb GB RAM. The upstream WSA minimum is 8 GB; performance or installation may be unreliable."
-        if (-not (Read-Confirmation 'Continue anyway?')) {
+        throw "This PC has $memoryGb GB RAM. The upstream WSA minimum is 8 GB. RAM cannot be added by this installer; upgrade the hardware or use a different PC."
+    }
+    Write-Info "Installed RAM: $memoryGb GB (passed; 8 GB minimum)"
+
+    $processor = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
+    $firmwareVirtualizationEnabled = $processor.VirtualizationFirmwareEnabled
+    $hypervisorPresent = $computer.HypervisorPresent -eq $true
+
+    if ($firmwareVirtualizationEnabled -eq $false -and -not $hypervisorPresent) {
+        throw 'Hardware virtualization is reported as disabled in BIOS/UEFI. A Windows script cannot safely change firmware settings. Enable Intel VT-x / Intel Virtualization Technology or AMD-V / SVM Mode in BIOS/UEFI, save, restart Windows, and run this setup again.'
+    }
+    elseif ($firmwareVirtualizationEnabled -eq $true -or $hypervisorPresent) {
+        Write-Info 'Hardware virtualization: enabled (passed)'
+    }
+    else {
+        Write-WarningMessage 'Windows could not verify the firmware virtualization flag on this processor.'
+        if (-not (Read-Confirmation 'Open Task Manager > Performance > CPU and confirm that Virtualization says Enabled. Continue anyway?')) {
+            Write-Info 'Cancelled. No Windows features were changed.'
             exit 0
         }
     }
 
-    $processor = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
-    if ($processor.VirtualizationFirmwareEnabled -eq $false) {
-        if ($Target.Architecture -eq 'x64') {
-            throw 'CPU virtualization is disabled in BIOS/UEFI. Enable Intel VT-x or AMD-V, restart Windows, then run this setup again.'
+    try {
+        $gpuNames = @(
+            Get-CimInstance -ClassName Win32_VideoController -ErrorAction Stop |
+                ForEach-Object { [string]$_.Name } |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+        if ($gpuNames.Count -eq 0) {
+            Write-WarningMessage 'Windows did not report a graphics adapter. WSA graphics compatibility could not be checked.'
         }
-        Write-WarningMessage 'Windows did not report the ARM64 firmware virtualization flag. The Windows hypervisor features will be checked next.'
+        else {
+            Write-Info "Detected graphics adapter(s): $($gpuNames -join ', ')"
+            if (($gpuNames -join ' ') -match '(?i)Intel.*HD Graphics 530') {
+                Write-WarningMessage 'The upstream WSABuilds guide reports issues with Intel HD Graphics 530 and older. WSA may fail to start or show graphics problems on this adapter.'
+            }
+        }
+    }
+    catch {
+        Write-WarningMessage "The graphics adapter could not be queried. This is not an automatic blocker, but WSA graphics compatibility is unverified. $($_.Exception.Message)"
     }
 
     $requiredFeatures = @('VirtualMachinePlatform', 'HypervisorPlatform')
     $missingFeatures = @()
+    $restartRequired = $false
+
     foreach ($featureName in $requiredFeatures) {
-        $feature = Get-WindowsOptionalFeature -Online -FeatureName $featureName -ErrorAction SilentlyContinue
-        if ($null -eq $feature -or $feature.State -ne 'Enabled') {
-            $missingFeatures += $featureName
+        try {
+            $feature = Get-WindowsOptionalFeature -Online -FeatureName $featureName -ErrorAction Stop
+        }
+        catch {
+            throw "Could not inspect the required Windows feature '$featureName'. No feature changes were made. Run Windows Update and retry, or enable it manually from OptionalFeatures.exe. Details: $($_.Exception.Message)"
+        }
+
+        switch ([string]$feature.State) {
+            'Enabled' {
+                Write-Info ("Windows feature {0}: Enabled (passed)" -f $featureName)
+            }
+            'EnablePending' {
+                Write-WarningMessage ("Windows feature {0} is enabled but waiting for a restart." -f $featureName)
+                $restartRequired = $true
+            }
+            { $_ -in @('Disabled', 'DisabledWithPayloadRemoved') } {
+                $missingFeatures += $featureName
+                Write-WarningMessage ("Windows feature {0} is disabled; the helper will enable it automatically." -f $featureName)
+            }
+            default {
+                throw "Windows feature '$featureName' has unexpected state '$($feature.State)'. No WSA installation was started."
+            }
         }
     }
 
     if ($missingFeatures.Count -gt 0) {
-        Write-WarningMessage "Windows virtualization features need enabling: $($missingFeatures -join ', ')."
-        if (Read-Confirmation 'Enable these Windows features now? A Windows restart will be required.') {
-            foreach ($featureName in $missingFeatures) {
-                Enable-WindowsOptionalFeature -Online -FeatureName $featureName -All -NoRestart | Out-Null
+        foreach ($featureName in $missingFeatures) {
+            Write-Info ("Enabling Windows feature: {0}" -f $featureName)
+            try {
+                Enable-WindowsOptionalFeature -Online -FeatureName $featureName -All -NoRestart -ErrorAction Stop | Out-Null
             }
-            Write-Host ''
-            Write-Info 'The Windows features have been enabled. Restart Windows, then run "Install matching WSA runtime" from the Start Menu.'
+            catch {
+                throw "Windows could not enable '$featureName'. Check Windows Update and available component-store files, then retry. You can also enable it from an elevated PowerShell window with: Enable-WindowsOptionalFeature -Online -FeatureName $featureName -All. Details: $($_.Exception.Message)"
+            }
+
+            $verifiedFeature = Get-WindowsOptionalFeature -Online -FeatureName $featureName -ErrorAction Stop
+            if ($verifiedFeature.State -notin @('Enabled', 'EnablePending')) {
+                throw "Windows did not confirm that '$featureName' was enabled (state: $($verifiedFeature.State)). WSA installation was stopped."
+            }
+            Write-Info ("Windows feature {0}: {1} (verified)" -f $featureName, $verifiedFeature.State)
         }
-        else {
-            Write-Info 'No Windows features were changed.'
-        }
+
+        $restartRequired = $true
+    }
+
+    if ($restartRequired) {
+        Write-Host ''
+        Write-WarningMessage 'Windows virtualization features are enabled or pending, but Windows must restart before WSA can be installed.'
+        Write-Info 'Save your work and restart Windows. Then open Start > WSA PacMan > Install matching WSA Android runtime.'
+        Write-Info 'The helper will re-check every requirement and continue with the matching runtime after restart.'
         exit 0
     }
+
+    Write-Info 'Windows virtualization features: both enabled (passed)'
 }
 
 function Invoke-VerifiedDownload(
