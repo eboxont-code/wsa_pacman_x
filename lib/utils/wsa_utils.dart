@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:bitsdojo_window/bitsdojo_window.dart';
+
 import 'package:wsa_pacman/global_state.dart';
 import 'package:wsa_pacman/main.dart';
 import 'package:wsa_pacman/windows/win_io.dart';
@@ -9,7 +11,15 @@ import '../utils/regexp_utils.dart';
 
 class WSAUtils {
   static bool launch([String? param]) => WinIO.run(ShellOp.OPEN, "shell:appsFolder\\${Env.WSA_INFO.familyName}!${Env.WSA_INFO.clientID}", param);
-  static bool launchApp(String package) => launch("/launch wsa://$package");
+  static bool launchApp(String package) {
+    final launched = launch("/launch wsa://$package");
+    // Starting an Android app should leave PacMan quietly available in the tray.
+    // Keep temporary APK-installer windows' existing close behavior unchanged.
+    if (launched && isDesktop && !Constants.installMode) {
+      appWindow.hide();
+    }
+    return launched;
+  }
   static bool launchSettings() => launchApp("com.android.settings");
   static bool launchDeveloperSettings() => launch("/deeplink wsa-client://developer-settings");
   static bool launchSystem() => launchApp("android.system");
