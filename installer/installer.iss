@@ -10,7 +10,7 @@
 
 #define executable "WSA-pacman.exe"
 #define app_name "WSA Package Manager"
-#define dist_appname "WSA-pacman"
+#define dist_appname "WSA-pacman-universal"
 #define reg_appname "wsa-pacman"
 #define reg_name_installer "Package installer"
 
@@ -26,7 +26,9 @@ AppVersion=1.5.0
 PrivilegesRequired=admin
 AppName=WSA PacMan
 AppPublisher=alesimula
-ArchitecturesInstallIn64BitMode=x64
+; The x64 application runs natively on x64 Windows and under built-in emulation on Windows 11 ARM64.
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 DefaultDirName={autopf}\WSA PacMan
 DefaultGroupName=WSA PacMan
