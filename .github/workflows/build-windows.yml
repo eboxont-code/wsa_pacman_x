@@ -184,7 +184,7 @@ jobs:
           }
 
           $wsaUtilsText = Get-Content "lib/utils/wsa_utils.dart" -Raw
-          if ($wsaUtilsText -notmatch "appWindow.hide\(\)") {
+          if ($wsaUtilsText -notmatch "appWindow.minimize\(\)") {
             throw "Launching an Android app from PacMan must hide the manager to the tray"
           }
 
