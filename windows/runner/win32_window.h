@@ -50,6 +50,8 @@ class Win32Window {
 
   // If true, closing this window will quit the application.
   void SetQuitOnClose(bool quit_on_close);
+  // Keep the main WSA PacMan window running in the notification area when closed.
+  void SetCloseToTray(bool close_to_tray);
 
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
@@ -87,6 +89,15 @@ class Win32Window {
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
 
   bool quit_on_close_ = false;
+  bool close_to_tray_ = false;
+  bool tray_icon_added_ = false;
+  bool exit_requested_ = false;
+  UINT taskbar_created_message_ = 0;
+
+  bool AddTrayIcon();
+  void RemoveTrayIcon();
+  void ShowFromTray();
+  void ShowTrayMenu();
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;
