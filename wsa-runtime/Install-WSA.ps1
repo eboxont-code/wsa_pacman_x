@@ -150,7 +150,7 @@ function Get-ExistingWsaPackage {
     }
 }
 
-function Confirm-WsaPrerequisites {
+function Confirm-WsaPrerequisites($Target) {
     $systemDrive = [IO.Path]::GetPathRoot($env:SystemRoot)
     $driveInfo = New-Object System.IO.DriveInfo($systemDrive)
 
@@ -172,7 +172,10 @@ function Confirm-WsaPrerequisites {
 
     $processor = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
     if ($processor.VirtualizationFirmwareEnabled -eq $false) {
-        throw 'CPU virtualization is disabled in BIOS/UEFI. Enable Intel VT-x, AMD-V or the device virtualization option, restart Windows, then run this setup again.'
+        if ($Target.Architecture -eq 'x64') {
+            throw 'CPU virtualization is disabled in BIOS/UEFI. Enable Intel VT-x or AMD-V, restart Windows, then run this setup again.'
+        }
+        Write-WarningMessage 'Windows did not report the ARM64 firmware virtualization flag. The Windows hypervisor features will be checked next.'
     }
 
     $requiredFeatures = @('VirtualMachinePlatform', 'HypervisorPlatform')
@@ -353,7 +356,7 @@ try {
         exit 0
     }
 
-    Confirm-WsaPrerequisites
+    Confirm-WsaPrerequisites -Target $target
 
     $computer = Get-CimInstance -ClassName Win32_ComputerSystem
     $memoryGb = [math]::Round($computer.TotalPhysicalMemory / 1GB, 1)
