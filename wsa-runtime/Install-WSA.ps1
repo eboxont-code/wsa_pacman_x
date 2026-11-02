@@ -93,13 +93,78 @@ public static class WsaPacmanNativeMachine
 function Get-WindowsTarget {
     $versionKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
     $currentBuild = Get-ItemProperty -Path $versionKey
+    $build = [int]$currentBuild.CurrentBuildNumber
+    $revision = [int]$currentBuild.UBR
+    $architecture = Get-NativeArchitecture
+
+    if ($build -ge 22000) {
+        if ($build -eq 22000 -and $revision -lt 526) {
+            throw 'WSA requires Windows 11 build 22000.526 or later.'
+        }
+        if ($architecture -eq 'arm64') {
+            return [pscustomobject]@{
+                Architecture = $architecture
+                OsFamily = 'Windows_11'
+                TagPattern = '^Windows_11_.*_LTS_(?<lts>\d+)_arm64$'
+                AssetPattern = 'NoGApps-NoAmazon\.7z$'
+            }
+        }
+        return [pscustomobject]@{
+            Architecture = $architecture
+            OsFamily = 'Windows_11'
+            TagPattern = '^Windows_11_.*_LTS_(?<lts>\d+)$'
+            AssetPattern = 'NoGApps-NoAmazon\.7z$'
+        }
+    }
+
+    if ($build -ge 19045) {
+        if ($architecture -ne 'x64') {
+            throw 'WSA community builds are not published for Windows 10 ARM64.'
+        }
+        if ($build -eq 19045 -and $revision -lt 2311) {
+            throw 'WSA requires Windows 10 22H2 build 19045.2311 or later.'
+        }
+        return [pscustomobject]@{
+            Architecture = $architecture
+            OsFamily = 'Windows_10'
+            TagPattern = '^Windows_10_.*_LTS_(?<lts>\d+)$'
+            AssetPattern = 'NoGApps-NoAmazon_Windows_10\.7z$'
+        }
+    }
+
+    throw 'This WSA setup supports Windows 11 build 22000.526+ and Windows 10 22H2 build 19045.2311+ only.'
+}
+
+function Get-ExistingWsaPackage {
+    try {
+        return @(
+            Get-AppxPackage -AllUsers -ErrorAction Stop |
+                Where-Object {
+                    $_.Name -match 'WindowsSubsystemForAndroid' -or
+                    $_.PackageFamilyName -match 'WindowsSubsystemForAndroid'
+                }
+        )
+    }
+    catch {
+        throw "Could not safely check for an existing WSA installation. No changes were made. Details: $($_.Exception.Message)"
+    }
+}
+
+function Confirm-WsaPrerequisites($Target) {
+    $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
+    if ([int]$osInfo.ProductType -ne 1) {
+        throw 'The WSA runtime helper supports Windows 10/11 desktop editions only; Windows Server is not supported.'
+    }
+
+    $versionKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+    $currentBuild = Get-ItemProperty -Path $versionKey
     $buildNumber = [int]$currentBuild.CurrentBuildNumber
     $revision = [int]$currentBuild.UBR
     $edition = [string]$currentBuild.EditionID
     $displayVersion = [string]$currentBuild.DisplayVersion
 
-    # ProductName may continue to say "Windows 10" on newer Windows 11 installs.
-    # Use the OS build family for an accurate user-facing label.
+    # ProductName can retain a Windows 10 label on newer Windows 11 installations.
+    # Use the build family for the displayed OS version instead.
     if ($buildNumber -ge 28000) {
         $windowsLabel = 'Windows 11 26H1'
     }
@@ -160,8 +225,7 @@ function Get-WindowsTarget {
     Write-Info ("Virtualization diagnostics: firmware flag={0}; VM monitor extensions={1}; SLAT={2}; Windows hypervisor active={3}" -f $firmwareVirtualizationEnabled, $vmMonitorExtensions, $slatExtensions, $hypervisorPresent)
 
     if ($hypervisorPresent) {
-        # A running Windows hypervisor could not be active without hardware
-        # virtualization. Prefer this live state over a possibly stale WMI flag.
+        # An active Windows hypervisor confirms that firmware virtualization is usable.
         Write-Info 'Hardware virtualization: Windows hypervisor is already active (passed)'
     }
     elseif ($firmwareVirtualizationEnabled -eq $true) {
