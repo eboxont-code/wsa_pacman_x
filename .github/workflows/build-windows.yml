@@ -5,6 +5,7 @@ on:
     branches:
       - custom/white-ui
       - wsa/auto-architecture-runtime
+      - wsa/auto-prerequisite-repair
   pull_request:
     branches:
       - main
