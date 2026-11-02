@@ -5,6 +5,7 @@ on:
     branches:
       - custom/white-ui
       - wsa/auto-architecture-runtime
+      - wsa/auto-prerequisite-repair
   pull_request:
     branches:
       - main
@@ -35,11 +36,48 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Validate WSA runtime setup script syntax
+      - name: Validate WSA runtime checks and installer defaults
         shell: pwsh
         run: |
           $scriptText = Get-Content "wsa-runtime/Install-WSA.ps1" -Raw
-          [void][scriptblock]::Create($scriptText)
+          $tokens = $null
+          $parseErrors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseInput(
+            $scriptText, [ref]$tokens, [ref]$parseErrors
+          )
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.Message }
+            throw "WSA runtime setup script contains PowerShell syntax errors"
+          }
+
+          $requiredChecks = @(
+            "Get-NativeArchitecture",
+            "VirtualizationFirmwareEnabled",
+            "VirtualMachinePlatform",
+            "HypervisorPlatform",
+            "Get-WindowsOptionalFeature",
+            "Enable-WindowsOptionalFeature",
+            "TotalPhysicalMemory",
+            "DriveFormat",
+            "AvailableFreeSpace",
+            "Get-FileHash"
+          )
+          foreach ($check in $requiredChecks) {
+            if ($scriptText -notmatch [regex]::Escape($check)) {
+              throw "Required WSA prerequisite/security check is missing: $check"
+            }
+          }
+
+          $installerText = Get-Content "installer/installer.iss" -Raw
+          $runtimeTask = $installerText -split "\r?\n" |
+            Where-Object { $_ -match '^Name: install_wsa_runtime;' } |
+            Select-Object -First 1
+          if (-not $runtimeTask) {
+            throw "The optional matching-WSA runtime installer task is missing"
+          }
+          if ($runtimeTask -match 'Flags:\s*unchecked') {
+            throw "The matching-WSA runtime installer task must be selected by default"
+          }
 
       - name: Build Windows application
         run: flutter build windows --release
