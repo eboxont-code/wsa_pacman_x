@@ -3,26 +3,17 @@
 import 'dart:async';
 import 'dart:developer';
 
-import 'package:jovial_svg/jovial_svg.dart';
 import 'package:mdi/mdi.dart';
-import 'package:protobuf/protobuf.dart';
 import 'package:wsa_pacman/global_state.dart';
-import 'package:wsa_pacman/proto/options.pb.dart';
 import 'package:wsa_pacman/utils/locale_utils.dart';
-import 'package:wsa_pacman/widget/adaptive_icon.dart';
 import 'package:wsa_pacman/widget/fluent_card.dart';
 import 'package:wsa_pacman/widget/fluent_combo_box.dart';
-import 'package:wsa_pacman/widget/fluent_expander.dart';
 import 'package:wsa_pacman/widget/fluent_text_box.dart';
 import 'package:wsa_pacman/widget/smooth_list_view.dart';
-import 'package:wsa_pacman/windows/win_info.dart';
 
 import '/utils/string_utils.dart';
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-
-import '../theme.dart';
 
 const List<String> accentColorNames = [
   'System',
@@ -75,42 +66,10 @@ class ScreenSettingsState extends State<ScreenSettings> {
   ScreenSettingsState({this.controller});
   final ScrollController? controller;
 
-  static late final _exBackground = _loadIcon("assets/icons/missing_icon_background.si");
-  static late final _exForeground = _loadIcon("assets/icons/missing_icon_foreground.si");
-  static late final _exLegacyIcon = _loadIcon("assets/icons/missing_icon_legacy.si");
-
-  static Future<ScalableImageWidget> _loadIcon(String asset) async {
-    var scalable = ScalableImage.fromSIAsset(rootBundle, asset);
-    return ScalableImageWidget(si: await scalable);
-  }
-
-  static List<Widget> optionsListDeferred<E extends ProtobufEnum, V>(List<E> values, String Function(E)? title, V Function(E e) getter, bool Function(V v) checked, Function(E e, V v) updater) => List.generate(values.length, (index) {
-    final modeOpt = values[index];
-    final mode = getter(modeOpt);
-    return Padding(
-      padding: index != values.length - 1 ? const EdgeInsets.only(bottom: 8.0) : EdgeInsets.zero,
-      child: RadioButton(
-        checked: checked(mode),
-        onChanged: (value) {
-          if (value) {
-            updater(modeOpt, mode);
-            //GState.theme..update((p0) => modeOpt)..persist();
-            //themeMode = mode;
-          }
-        },
-        content: Text(title != null ? title(modeOpt) : modeOpt.toString().normalized),
-      ),
-    );
-  });
-
-  static List<Widget> optionsList<E extends ProtobufEnum>(List<E> values, String Function(E)? title, bool Function(E e) checked, Function(E e) updater) =>
-      optionsListDeferred<E, E>(values, title, (e) => e, checked, (e, v) => updater(e));
-  
   static late final _localeItems = <NamedLocale>[LocaleUtils.SYSTEM_LOCALE].followedBy(LocaleUtils.supportedLocales).map((l)=>ComboboxItem(child: Text(l.name), value: l)).toList();
 
   @override
   Widget build(BuildContext context) {
-    final appTheme = context.watch<AppTheme>();
     final theme = FluentTheme.of(context);
     final locale_lang = GState.locale.of(context);
     final lang = AppLocalizations.of(context)!;
@@ -148,21 +107,11 @@ class ScreenSettingsState extends State<ScreenSettings> {
     const spacer = SizedBox(height: 10.0);
     const biggerSpacer = SizedBox(height: 40.0);
 
-    final themeMode = GState.theme.of(context).mode;
-    final iconShape = GState.iconShape.of(context);
-    final mica = GState.mica.of(context);
-    final legacyIcons = GState.legacyIcons.of(context);
     final autostartWSA = GState.autostartWSA.of(context);
     final installTimeout = GState.installTimeout.of(context);
-    final locale = AppLocalizations.of(context);
 
     final OFF = lang.btn_switch_off;
     final ON = lang.btn_switch_on;
-
-    final exampleIcon = FutureBuilder(
-      future: legacyIcons ? _exLegacyIcon : (() async =>AdaptiveIcon(background: await _exBackground, foreground: await _exForeground, radius: iconShape.radius))(), 
-      builder: (context, AsyncSnapshot<Widget> snapshot) => snapshot.data ?? empty
-    );
 
     return ScaffoldPage(
       header: PageHeader(title: Text(lang.screen_settings)),
@@ -240,43 +189,6 @@ class ScreenSettingsState extends State<ScreenSettings> {
               items: _localeItems,
             )),
           ),
-          smallSpacer,
-          ExpanderWin11(
-            leading: const Icon(Mdi.themeLightDark, size: 23),
-            header: Text(lang.theme_mode),
-            content: Column(crossAxisAlignment: CrossAxisAlignment.start, children: 
-                optionsListDeferred<Options_Theme, ThemeMode>(Options_Theme.values, (e)=>e.description(lang), (e) => e.mode, (v) => themeMode == v, (e, v) => GState.theme..update((p0) => e)..persist())
-            ),
-            //headerBackgroundColor: ThemablePaneItem.uncheckedInputAlphaColor(theme, states),
-            direction: ExpanderDirection.down, // (optional). Defaults to ExpanderDirection.down
-            initiallyExpanded: false, // (false). Defaults to false
-          ),
-          smallSpacer,
-          if (WinVer.isWindows11OrGreater) ExpanderWin11(
-            leading: const Icon(Mdi.blur, size: 23),
-            header: Text(lang.theme_mica),
-            content: Column(crossAxisAlignment: CrossAxisAlignment.start, children: 
-                optionsList<Options_Mica>(Options_Mica.values, (e)=>e.description(lang), (e) => mica == e, (e) => GState.mica..update((_) => e)..persist())
-            ),
-            //headerBackgroundColor: ThemablePaneItem.uncheckedInputAlphaColor(theme, states),
-            direction: ExpanderDirection.down, // (optional). Defaults to ExpanderDirection.down
-            initiallyExpanded: false, // (false). Defaults to false
-          ),
-          if (WinVer.isWindows11OrGreater) smallSpacer,
-          ExpanderWin11(
-            leading: SizedBox(width: 23.00, height: 23.00, child: exampleIcon),
-            header: Text(lang.theme_icon_adaptive),
-            content: Column(crossAxisAlignment: CrossAxisAlignment.start, children: 
-                optionsList<Options_IconShape>(Options_IconShape.values, (e)=>e.description(lang), (e) => iconShape == e, (e) => GState.iconShape..update((_) => e)..persist())
-            ),
-            trailing: Row(children: [ConstrainedBox(constraints: const BoxConstraints(minWidth: 28.5), child: Text(legacyIcons ? OFF : ON)), ToggleSwitch(
-              checked: !legacyIcons,
-              onChanged: (v) => GState.legacyIcons..$ = !v..persist()
-            )]),
-            //headerBackgroundColor: ThemablePaneItem.uncheckedInputAlphaColor(theme, states),
-            direction: ExpanderDirection.down, // (optional). Defaults to ExpanderDirection.down
-            initiallyExpanded: false, // (false). Defaults to false
-          )
         ],
       ),
     );
