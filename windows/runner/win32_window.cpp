@@ -139,8 +139,8 @@ bool Win32Window::CreateAndShow(const std::wstring& title,
   if (close_to_tray_) {
     taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
     if (!AddTrayIcon()) {
-      // Do not hide the window if the tray icon could not be registered.
-      close_to_tray_ = false;
+      // Keep close-to-tray requested. Until the shell accepts the icon, close
+      // falls back to taskbar-minimize and TaskbarCreated will retry registration.
       OutputDebugStringW(L"WSA PacMan: could not register notification-area icon.\\n");
     }
   }
@@ -175,29 +175,38 @@ Win32Window::MessageHandler(HWND hwnd,
                             LPARAM const lparam) noexcept {
   if (taskbar_created_message_ != 0 && message == taskbar_created_message_) {
     tray_icon_added_ = false;
-    if (close_to_tray_ && !AddTrayIcon()) {
-      // Explorer may be restarting. If the icon cannot be restored, keep the
-      // manager visible so the user never loses access to the running process.
-      close_to_tray_ = false;
-      ShowWindow(hwnd, SW_SHOW);
-      OutputDebugStringW(L"WSA PacMan: notification-area icon could not be restored.\\n");
+    if (close_to_tray_) {
+      if (AddTrayIcon()) {
+        // If tray registration previously failed, move a taskbar-minimized
+        // manager into the notification area now that Explorer is ready.
+        if (IsIconic(hwnd)) {
+          ShowWindow(hwnd, SW_HIDE);
+        }
+      } else {
+        // Explorer may be restarting. Keep the manager reachable if the icon
+        // cannot be restored; close will continue to fall back to taskbar-minimize.
+        ShowWindow(hwnd, SW_RESTORE);
+        OutputDebugStringW(L"WSA PacMan: notification-area icon could not be restored.\\n");
+      }
     }
     return 0;
   }
 
   switch (message) {
     case WM_CLOSE:
-      if (close_to_tray_ && tray_icon_added_ && !exit_requested_) {
-        ShowWindow(hwnd, SW_HIDE);
+      if (close_to_tray_ && !exit_requested_) {
+        // Hide only when the notification icon exists. Otherwise keep the
+        // process alive in the taskbar until Explorer can register the icon.
+        ShowWindow(hwnd, tray_icon_added_ ? SW_HIDE : SW_MINIMIZE);
         return 0;
       }
       break;
 
     case WM_SYSCOMMAND:
       // bitsdojo_window's CloseWindowButton sends SC_CLOSE directly.
-      if (close_to_tray_ && tray_icon_added_ && !exit_requested_ &&
+      if (close_to_tray_ && !exit_requested_ &&
           (wparam & 0xFFF0) == SC_CLOSE) {
-        ShowWindow(hwnd, SW_HIDE);
+        ShowWindow(hwnd, tray_icon_added_ ? SW_HIDE : SW_MINIMIZE);
         return 0;
       }
       break;
