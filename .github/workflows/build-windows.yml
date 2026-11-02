@@ -169,6 +169,8 @@ jobs:
             "Exit WSA PacMan",
             "Open WSA PacMan",
             "IsIconic(window_handle_)",
+            "IsIconic(hwnd)",
+            "tray_icon_added_ ? SW_HIDE : SW_MINIMIZE",
             "notification-area icon could not be restored"
           )
           foreach ($check in $trayChecks) {
