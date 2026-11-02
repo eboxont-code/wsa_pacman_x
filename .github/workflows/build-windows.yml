@@ -87,6 +87,7 @@ jobs:
             "Register-ScheduledTask",
             "ResumeAfterRestart",
             "Automatic continuation",
+            " < nul",
             "VirtualMachinePlatform",
             "HypervisorPlatform",
             "Get-WindowsOptionalFeature",
