@@ -1,0 +1,99 @@
+name: Build WSA PacMan for Windows
+
+on:
+  push:
+    branches:
+      - custom/white-ui
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter 3.3.9
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.3.9'
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build Windows application
+        run: flutter build windows --release
+
+      - name: Verify bundled runtime files and prepare portable package
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            "build/windows/runner/Release/WSA-pacman.exe",
+            "build/windows/runner/Release/flutter_windows.dll",
+            "embedded-tools/adb.exe",
+            "embedded-tools/AdbWinApi.dll",
+            "embedded-tools/AdbWinUsbApi.dll",
+            "embedded-tools/aapt.exe",
+            "embedded-tools/aapt2.exe",
+            "embedded-tools/axmldec.exe",
+            "installer/redist/VC_redist.x64.exe"
+          )
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) {
+              throw "Required bundled runtime file is missing: $file"
+            }
+          }
+
+          New-Item -ItemType Directory -Force -Path "build/installer" | Out-Null
+          Copy-Item -Path "embedded-tools" -Destination "build/windows/runner/Release/embedded-tools" -Recurse -Force
+
+          $packagedTools = @("adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll", "aapt.exe", "aapt2.exe", "axmldec.exe")
+          foreach ($tool in $packagedTools) {
+            if (-not (Test-Path "build/windows/runner/Release/embedded-tools/$tool")) {
+              throw "Bundled helper tool was not copied into the release package: $tool"
+            }
+          }
+
+          Compress-Archive -Path "build/windows/runner/Release/*" -DestinationPath "build/installer/WSA-PacMan-portable.zip" -Force
+          if (-not (Test-Path "build/installer/WSA-PacMan-portable.zip")) {
+            throw "Portable package was not created"
+          }
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        working-directory: installer
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6/ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            throw "Inno Setup compiler not found at $compiler"
+          }
+          & $compiler "installer.iss"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: wsa-pacman-windows-${{ github.sha }}
+          path: |
+            build/installer/WSA-PacMan-portable.zip
+            build/installer/WSA-pacman-v1.5.0-installer.exe
+          if-no-files-found: error
+          retention-days: 14
