@@ -149,9 +149,10 @@ jobs:
             }
           }
           if ($trayHeader -notmatch "SetCloseToTray" -or
-              $trayMain -notmatch "SetCloseToTray\(true\)" -or
+              $trayMain -notmatch "SetCloseToTray\\(is_main_manager_window\\)" -or
+              $trayMain -notmatch "command_line_arguments.empty\\(\\)" -or
               $trayCmake -notmatch "shell32") {
-            throw "The WSA PacMan runner is not fully configured for notification-area support"
+            throw "The WSA PacMan main window is not fully configured for notification-area support"
           }
 
           $wsaUtilsText = Get-Content "lib/utils/wsa_utils.dart" -Raw
