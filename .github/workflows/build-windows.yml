@@ -37,12 +37,40 @@ jobs:
       - name: Build Windows application
         run: flutter build windows --release
 
-      - name: Prepare portable package and installer output
+      - name: Verify bundled runtime files and prepare portable package
         shell: pwsh
         run: |
+          $requiredFiles = @(
+            "build/windows/runner/Release/WSA-pacman.exe",
+            "build/windows/runner/Release/flutter_windows.dll",
+            "embedded-tools/adb.exe",
+            "embedded-tools/AdbWinApi.dll",
+            "embedded-tools/AdbWinUsbApi.dll",
+            "embedded-tools/aapt.exe",
+            "embedded-tools/aapt2.exe",
+            "embedded-tools/axmldec.exe",
+            "installer/redist/VC_redist.x64.exe"
+          )
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) {
+              throw "Required bundled runtime file is missing: $file"
+            }
+          }
+
           New-Item -ItemType Directory -Force -Path "build/installer" | Out-Null
           Copy-Item -Path "embedded-tools" -Destination "build/windows/runner/Release/embedded-tools" -Recurse -Force
+
+          $packagedTools = @("adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll", "aapt.exe", "aapt2.exe", "axmldec.exe")
+          foreach ($tool in $packagedTools) {
+            if (-not (Test-Path "build/windows/runner/Release/embedded-tools/$tool")) {
+              throw "Bundled helper tool was not copied into the release package: $tool"
+            }
+          }
+
           Compress-Archive -Path "build/windows/runner/Release/*" -DestinationPath "build/installer/WSA-PacMan-portable.zip" -Force
+          if (-not (Test-Path "build/installer/WSA-PacMan-portable.zip")) {
+            throw "Portable package was not created"
+          }
 
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
