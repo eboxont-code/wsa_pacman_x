@@ -16,6 +16,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 
 class LateUpdater<E> {
+  static const SETTINGS_UPDATE_TIMER = Duration(seconds:3);
   E initialValue;
   Timer? timer;
   Function(E value) callback;
@@ -49,7 +50,6 @@ late final androidPortUpdater = LateUpdater<int>(GState.androidPort.$, (value){
 });
 
 class ScreenSettingsState extends State<ScreenSettings> {
-  static const SETTINGS_UPDATE_TIMER = Duration(seconds:3);
   ScreenSettingsState({this.controller});
   final ScrollController? controller;
 
