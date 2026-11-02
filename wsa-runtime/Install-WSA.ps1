@@ -517,16 +517,29 @@ function Install-WsaFromFolder([string]$Folder) {
     # Upstream Finish() launches Magisk and Play Store after registering WSA.
     # This helper selects a NoGApps package, so don't launch unrelated Android apps.
     $finishPattern = '(?ims)^Function\s+Finish\s*\{.*?^\}'
-    if ([regex]::IsMatch($sourceText, $finishPattern)) {
-        $finishReplacement = 'Function Finish {' + [Environment]::NewLine +
-            "    Write-Output 'WSA runtime registration completed.'" + [Environment]::NewLine + '}'
-        $sourceText = [regex]::Replace($sourceText, $finishPattern, $finishReplacement, 1)
+    if (-not [regex]::IsMatch($sourceText, $finishPattern)) {
+        throw 'The upstream installer has an unrecognized Finish() function. Refusing to launch unrelated Android apps automatically.'
     }
+    $finishReplacement = 'Function Finish {' + [Environment]::NewLine +
+        "    Write-Output 'WSA runtime registration completed.'" + [Environment]::NewLine + '}'
+    $finishEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $finishReplacement
+    }
+    $sourceText = [regex]::Replace($sourceText, $finishPattern, $finishEvaluator)
 
     # Upstream prompts for keypresses on completion and error branches. Remove
     # the waits. An existing-install confirmation gets a null key, i.e. "No".
     $readKeyPattern = '(?m)(\$[A-Za-z_][A-Za-z0-9_]*\s*=\s*)\$Host\.UI\.RawUI\.ReadKey\(''NoEcho,IncludeKeyDown''\);?'
-    $sourceText = [regex]::Replace($sourceText, $readKeyPattern, '$1$null')
+    $readKeyMatches = [regex]::Matches($sourceText, $readKeyPattern)
+    if ($readKeyMatches.Count -eq 0) {
+        throw 'The upstream installer no longer contains the expected keypress prompt pattern. Refusing to run an unverified unattended variant.'
+    }
+    $readKeyEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $match.Groups[1].Value + '$null'
+    }
+    $sourceText = [regex]::Replace($sourceText, $readKeyPattern, $readKeyEvaluator)
     if ($sourceText -match '(?i)RawUI\.ReadKey\s*\(') {
         throw 'The upstream installer contains an unrecognized interactive keypress prompt. Refusing to run it hidden because that could leave setup waiting indefinitely.'
     }
@@ -536,7 +549,11 @@ function Install-WsaFromFolder([string]$Folder) {
     if ([regex]::IsMatch($sourceText, $preservePattern)) {
         $preserveReplacement = 'ElseIf ($null -Ne $Installed) {' + [Environment]::NewLine +
             "    throw 'WSA registration failed while an existing package is present. PacMan will not uninstall or replace it.'" + [Environment]::NewLine + '}'
-        $sourceText = [regex]::Replace($sourceText, $preservePattern, $preserveReplacement, 1)
+        $preserveEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+            param($match)
+            return $preserveReplacement
+        }
+        $sourceText = [regex]::Replace($sourceText, $preservePattern, $preserveEvaluator)
     }
 
     # The outer PacMan helper is already elevated. Keep even an unexpected
