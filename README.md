@@ -23,7 +23,7 @@ The same Windows installer is designed for:
 
 The application and bundled ADB/AAPT/AAPT2/AXML helper programs are x64 binaries, not native ARM64 binaries. Windows 11 on ARM can run them through its built-in x64 emulation; no separate emulator download is needed. This is an architecture-compatible universal installer, not a native ARM64 build. Windows 10 on ARM does not provide x64 emulation and is not supported by this package.
 
-The WSA distribution itself is separate and must be compatible with the PC's processor architecture (x64 WSA on x64 PCs, ARM64 WSA on ARM64 PCs). WSA PacMan does not replace or convert the Android runtime.
+The runtime helper picks the WSA distribution architecture to match the PC automatically. WSA itself remains architecture-specific: an x64 image cannot be installed on an ARM64 Windows host, or vice versa.
 
 ## Settings
 
