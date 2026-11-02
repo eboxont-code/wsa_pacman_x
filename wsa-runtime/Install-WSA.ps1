@@ -49,8 +49,18 @@ function Ensure-Administrator {
         if ($ResumeAfterRestart) {
             $arguments += ' -ResumeAfterRestart'
         }
-        Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden | Out-Null
-        exit 0
+        try {
+            $elevatedProcess = Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden -Wait -PassThru
+            if ($null -eq $elevatedProcess -or $elevatedProcess.ExitCode -ne 0) {
+                Write-WarningMessage 'The elevated WSA runtime setup did not complete successfully.'
+                exit 1
+            }
+            exit 0
+        }
+        catch {
+            Write-WarningMessage "Could not complete the elevated WSA runtime setup. $($_.Exception.Message)"
+            exit 1
+        }
     }
 }
 
