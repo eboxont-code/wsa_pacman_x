@@ -8,6 +8,7 @@ on:
       - wsa/auto-prerequisite-repair
       - wsa/virtualization-diagnostics
       - wsa/automatic-runtime-resume
+      - wsa/tray-background-silent-install
   pull_request:
     branches:
       - main
@@ -111,6 +112,51 @@ jobs:
           }
           if ($scriptText -match "Then open Start > WSA PacMan") {
             throw "The runtime helper must resume automatically after the prerequisite restart"
+          }
+          if ($scriptText -match "Read-Host") {
+            throw "The runtime helper must not require an interactive PowerShell console"
+          }
+          if ($scriptText -notmatch "-WindowStyle Hidden") {
+            throw "The runtime helper and its elevation/resume processes must be hidden"
+          }
+
+          $installerText = Get-Content "installer/installer.iss" -Raw
+          if ($installerText -notmatch "Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime") {
+            throw "The Android runtime helper must run hidden and finish before installer completion"
+          }
+          if ($installerText -match "skipifsilent") {
+            throw "Silent Inno Setup installs must still run the selected Android runtime task"
+          }
+
+          $traySource = Get-Content "windows/runner/win32_window.cpp" -Raw
+          $trayHeader = Get-Content "windows/runner/win32_window.h" -Raw
+          $trayMain = Get-Content "windows/runner/main.cpp" -Raw
+          $trayCmake = Get-Content "windows/runner/CMakeLists.txt" -Raw
+          $trayChecks = @(
+            "Shell_NotifyIconW",
+            "NIM_ADD",
+            "NIM_DELETE",
+            "TaskbarCreated",
+            "WM_CLOSE",
+            "SC_CLOSE",
+            "SIZE_MINIMIZED",
+            "Exit WSA PacMan",
+            "Open WSA PacMan"
+          )
+          foreach ($check in $trayChecks) {
+            if ($traySource -notmatch [regex]::Escape($check)) {
+              throw "Required native tray behavior is missing: $check"
+            }
+          }
+          if ($trayHeader -notmatch "SetCloseToTray" -or
+              $trayMain -notmatch "SetCloseToTray\(is_main_manager_window\)" -or
+              $trayCmake -notmatch "shell32") {
+            throw "The WSA PacMan runner is not fully configured for notification-area support"
+          }
+
+          $wsaUtilsText = Get-Content "lib/utils/wsa_utils.dart" -Raw
+          if ($wsaUtilsText -notmatch "appWindow.hide\(\)") {
+            throw "Launching an Android app from PacMan must hide the manager to the tray"
           }
 
           $installerText = Get-Content "installer/installer.iss" -Raw
