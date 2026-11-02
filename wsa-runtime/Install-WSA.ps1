@@ -21,8 +21,22 @@ function Write-WarningMessage([string]$Message) {
 }
 
 function Read-Confirmation([string]$Message) {
-    $answer = Read-Host "$Message [Y/N]"
-    return ($answer -match '^(?i)y(es)?$')
+    # Keep the helper console-free. Only hardware-virtualization ambiguity
+    # requires a human choice; present that choice as a normal Windows dialog.
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        $result = [System.Windows.Forms.MessageBox]::Show(
+            $Message,
+            'WSA PacMan prerequisite check',
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question
+        )
+        return ($result -eq [System.Windows.Forms.DialogResult]::Yes)
+    }
+    catch {
+        Write-WarningMessage "Could not display the prerequisite confirmation dialog. Setup will stop safely. $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Ensure-Administrator {
