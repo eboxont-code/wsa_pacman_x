@@ -124,10 +124,10 @@ jobs:
           if ($scriptText -notmatch "-WindowStyle Hidden") {
             throw "The runtime helper and its elevation/resume processes must be hidden"
           }
-          if ($scriptText -match "Start-Process -FilePath \\$env:ComSpec") {
+          if ($scriptText.Contains('Start-Process -FilePath $env:ComSpec')) {
             throw "WSA setup must not launch Run.bat because it spawns a visible PowerShell window"
           }
-          if ($scriptText -notmatch "Join-Path \\$workingDirectory 'Install.ps1'") {
+          if (-not $scriptText.Contains('Join-Path $workingDirectory ''Install.ps1''')) {
             throw "WSA setup must invoke the upstream Install.ps1 directly"
           }
           if ($scriptText -notmatch "preservePattern") {
