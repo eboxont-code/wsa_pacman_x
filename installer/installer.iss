@@ -43,7 +43,7 @@ OutputDir={#instbuilddir}
 [Tasks]
 Name: fileassoc_apk; Description: "{cm:AssocFileExtension,{#app_name},.apk}";
 Name: fileassoc_xapk; Description: "{cm:AssocFileExtension,{#app_name},.xapk}";
-Name: install_wsa_runtime; Description: "Download and install the matching WSA Android runtime (about 475–555 MB)"; Flags: unchecked;
+Name: install_wsa_runtime; Description: "Install the matching WSA Android runtime and automatically enable Windows virtualization features (about 475–555 MB download)";
 
 [Registry]
 Root: HKA; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "WSA_PACMAN_HOME"; ValueData: "{app}"; Flags: createvalueifdoesntexist preservestringtype uninsdeletevalue
