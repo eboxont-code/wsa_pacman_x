@@ -2,6 +2,13 @@
 # The archive is downloaded directly from the upstream GitHub release and SHA-256
 # checked before extraction. Existing WSA registrations are never removed/replaced.
 
+param(
+    [switch]$ResumeAfterRestart
+)
+
+$script:ResumeTaskName = 'WSA PacMan - Resume Android Runtime Setup'
+$script:TranscriptStarted = $false
+
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -25,8 +32,46 @@ function Ensure-Administrator {
         Write-Info 'Administrator permission is required to register the Android subsystem.'
         $powershell = Join-Path $PSHOME 'powershell.exe'
         $arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $PSCommandPath + '"'
+        if ($ResumeAfterRestart) {
+            $arguments += ' -ResumeAfterRestart'
+        }
         Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs | Out-Null
         exit 0
+    }
+}
+
+function Remove-WsaResumeTask {
+    try {
+        $task = Get-ScheduledTask -TaskName $script:ResumeTaskName -ErrorAction SilentlyContinue
+        if ($null -ne $task) {
+            Unregister-ScheduledTask -InputObject $task -Confirm:$false -ErrorAction Stop
+            Write-Info 'Removed the one-time automatic continuation task.'
+        }
+    }
+    catch {
+        Write-WarningMessage "Could not remove the automatic continuation task cleanly: $($_.Exception.Message)"
+    }
+}
+
+function Register-WsaResumeTask {
+    # Run at this user's next interactive sign-in, elevated, so the runtime
+    # installation can continue without requiring another Start-menu click.
+    $userId = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $powershell = Join-Path $PSHOME 'powershell.exe'
+    $scriptPath = '"' + $PSCommandPath + '"'
+    $arguments = '-NoProfile -ExecutionPolicy Bypass -File ' + $scriptPath + ' -ResumeAfterRestart'
+
+    try {
+        $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments -WorkingDirectory (Split-Path -Parent $PSCommandPath)
+        $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+        $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
+        $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 12) -MultipleInstances IgnoreNew
+        $task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'One-time WSA PacMan continuation after Windows virtualization features are enabled.'
+        Register-ScheduledTask -TaskName $script:ResumeTaskName -InputObject $task -Force -ErrorAction Stop | Out-Null
+        Write-Info 'Automatic continuation is registered for your next Windows sign-in.'
+    }
+    catch {
+        throw "Windows enabled the virtualization features, but could not schedule automatic continuation. Details: $($_.Exception.Message)"
     }
 }
 
@@ -322,9 +367,10 @@ function Confirm-WsaPrerequisites($Target) {
 
     if ($restartRequired) {
         Write-Host ''
-        Write-WarningMessage 'Windows virtualization features are enabled or pending, but Windows must restart before WSA can be installed.'
-        Write-Info 'Save your work and restart Windows. Then open Start > WSA PacMan > Install matching WSA Android runtime.'
-        Write-Info 'The helper will re-check every requirement and continue with the matching runtime after restart.'
+        Write-WarningMessage 'Windows virtualization features are enabled or pending. Save your work and restart Windows when convenient.'
+        Register-WsaResumeTask
+        Write-Info 'After Windows restarts and you sign in, WSA PacMan will automatically resume the Android runtime setup.'
+        Write-Info 'You do not need to reopen WSA PacMan or launch the helper manually.'
         exit 0
     }
 
@@ -435,7 +481,9 @@ function Install-WsaFromFolder([string]$Folder) {
     Write-Info "Starting the upstream WSA installer from $workingDirectory"
     Write-WarningMessage 'Do not close the installer window while WSA is being registered.'
 
-    $argumentLine = '/d /c "' + $runBatch.FullName + '"'
+    # WSABuilds leaves its PowerShell window on a final "press any key" pause.
+    # Redirect stdin from NUL so that non-interactive completion does not block.
+    $argumentLine = '/d /c call "' + $runBatch.FullName + '" < nul'
     $process = Start-Process -FilePath $env:ComSpec -ArgumentList $argumentLine -WorkingDirectory $workingDirectory -Wait -PassThru
 
     if ($process.ExitCode -ne 0) {
@@ -453,6 +501,23 @@ function Install-WsaFromFolder([string]$Folder) {
 
 try {
     Ensure-Administrator
+
+    $logDirectory = Join-Path $env:ProgramData 'WSABuilds\Logs'
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    $logPath = Join-Path $logDirectory ("Install-WSA-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    try {
+        Start-Transcript -Path $logPath -Force | Out-Null
+        $script:TranscriptStarted = $true
+    }
+    catch {
+        Write-WarningMessage "A diagnostic log could not be started: $($_.Exception.Message)"
+    }
+
+    if ($ResumeAfterRestart) {
+        Remove-WsaResumeTask
+        Write-Info 'Windows sign-in detected after the prerequisite restart; automatically resuming setup.'
+    }
+
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
     Write-Host ''
@@ -480,7 +545,6 @@ try {
             Write-Host 'Back up Userdata.vhdx before any manual architecture change:'
             Write-Host "$env:LOCALAPPDATA\Packages\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe\LocalCache\userdata.vhdx"
         }
-        Read-Host 'Press Enter to close'
         exit 0
     }
 
@@ -490,7 +554,6 @@ try {
         Write-Host "Possible Android app data is stored here: $previousUserData"
         Write-Host 'Copy this file to a safe backup location and move the original out of the WSA package folder before running a fresh install.'
         Write-Info 'No download, extraction, installation or deletion was performed.'
-        Read-Host 'Press Enter to close'
         exit 0
     }
 
@@ -517,10 +580,7 @@ try {
     Write-Host 'The extracted WSA folder must remain on this PC after installation.'
     Write-Host ''
 
-    if (-not (Read-Confirmation 'Download, verify, extract and install this matching WSA package now?')) {
-        Write-Info 'Cancelled. Nothing was installed or replaced.'
-        exit 0
-    }
+    Write-Info 'The WSA runtime installation task was selected. Continuing automatically with download, verification, extraction and registration.'
 
     $root = Join-Path $env:ProgramData 'WSABuilds'
     $installFolder = Join-Path $root ("WSA-" + $release.tag_name)
@@ -532,11 +592,9 @@ try {
         Select-Object -First 1
     if ($null -eq $runBatchAlreadyExtracted) {
         if (Test-Path -LiteralPath $installFolder) {
-            if (-not (Read-Confirmation "A partial folder already exists at $installFolder. Remove that incomplete folder and download again?")) {
-                Write-Info 'Cancelled. Existing files were left untouched.'
-                exit 0
-            }
-            Remove-Item -LiteralPath $installFolder -Recurse -Force
+            $preservedFolder = "$installFolder.incomplete.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+            Move-Item -LiteralPath $installFolder -Destination $preservedFolder -ErrorAction Stop
+            Write-WarningMessage "A previous incomplete extraction was preserved at $preservedFolder."
         }
         New-Item -ItemType Directory -Path $installFolder -Force | Out-Null
     }
@@ -564,18 +622,25 @@ try {
     Write-Info "WSA is registered: $($registeredPackage.Name)"
     Write-Info "The WSA files are stored at: $installFolder"
     Write-Info 'The WSA files must remain on this PC. Windows uses them to run WSA.'
-    Write-Host 'Next: open Windows Subsystem for Android Settings, enable Developer mode, and then launch WSA PacMan.'
+    Write-Host 'Next: WSA is installed. Open WSA PacMan to connect to the Android runtime.'
 
     if ($archivePath -and (Test-Path -LiteralPath $archivePath)) {
         Remove-Item -LiteralPath $archivePath -Force
     }
-
-    Read-Host 'Press Enter to close'
+    Remove-WsaResumeTask
+    if ($script:TranscriptStarted) {
+        Stop-Transcript | Out-Null
+        $script:TranscriptStarted = $false
+    }
 }
 catch {
     Write-Host ''
     Write-WarningMessage $_.Exception.Message
     Write-Host 'No existing WSA installation was automatically uninstalled or overwritten.'
-    Read-Host 'Press Enter to close'
+    if ($script:TranscriptStarted) {
+        Stop-Transcript | Out-Null
+        Write-Host "Diagnostic log: $logPath"
+        $script:TranscriptStarted = $false
+    }
     exit 1
 }
