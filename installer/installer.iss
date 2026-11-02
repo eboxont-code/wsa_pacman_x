@@ -73,9 +73,9 @@ Source: ".\redist\VC_redist.x64.exe"; DestDir: {tmp}; Flags: dontcopy
 Filename: "{tmp}\VC_redist.x64.exe"; StatusMsg: "Installing Visual C++ Redistributable..."; \
   Parameters: "/quiet /norestart /install"; Check: ShouldInstallVCRedist; Flags: waituntilterminated
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\wsa-runtime\Install-WSA.ps1"""; \
-  WorkingDir: "{app}\wsa-runtime"; Description: "Download and install the matching WSA Android runtime"; \
-  Flags: postinstall waituntilterminated skipifsilent; Tasks: install_wsa_runtime
+  Parameters: "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File ""{app}\wsa-runtime\Install-WSA.ps1"""; \
+  WorkingDir: "{app}\wsa-runtime"; \
+  Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime
 
 [Icons]
 Name: "{group}\WSA PacMan"; Filename: "{app}\{#executable}"
