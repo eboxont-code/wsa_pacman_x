@@ -98,6 +98,6 @@ jobs:
           name: wsa-pacman-windows-universal-${{ github.sha }}
           path: |
             build/installer/WSA-PacMan-portable-universal.zip
-            build/installer/WSA-pacman-v1.5.0-installer.exe
+            build/installer/WSA-pacman-universal-v1.5.0-installer.exe
           if-no-files-found: error
           retention-days: 14
