@@ -22,7 +22,7 @@ Microsoft ended official WSA support on 5 March 2025. These are community-mainta
 
 ## Background operation and sign-in compatibility
 
-On Windows, closing the main WSA PacMan window with the red **X** or using its minimize button hides it in the notification area instead of terminating the process. Left-click the tray icon to reopen PacMan; right-click it and choose **Exit WSA PacMan** to fully quit. Launching an Android app from inside PacMan also hides the active window to the tray. APK/XAPK installer windows do the same, so opening an app from an APK install flow does not terminate the PacMan process.
+On Windows, closing the main WSA PacMan window with the red **X** or using its minimize button hides it in the notification area instead of terminating the process. Left-click the tray icon to reopen PacMan; right-click it and choose **Exit WSA PacMan** to fully quit. Launching an Android app from the main PacMan manager hides the manager to the tray. Temporary APK/XAPK file-association installer windows keep their normal close behavior and do not add extra tray icons.
 
 The selected NoGApps runtime does **not** include Google Play Services. Some Android apps use Google's native sign-in SDKs or other Google Play Services APIs; those flows may fail even when the browser itself opens. A browser redirect back into an Android app also depends on that app's own Android intent filters/App Links. WSA PacMan is a package manager and cannot complete or repair OAuth callbacks for arbitrary third-party apps. WSABuilds currently warns that its GApps variants have been crashing on Windows 11, so switching to a GApps image is not a safe general fix. The affected Android app and its sign-in method must be checked individually.
 
