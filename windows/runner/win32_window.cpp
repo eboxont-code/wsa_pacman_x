@@ -3,10 +3,16 @@
 #include <flutter_windows.h>
 
 #include "resource.h"
+#include <shellapi.h>
 
 namespace {
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
+
+constexpr UINT kTrayCallbackMessage = WM_APP + 1;
+constexpr UINT kTrayIconId = 1;
+constexpr UINT kTrayShowCommand = 0x5001;
+constexpr UINT kTrayExitCommand = 0x5002;
 
 // The number of Win32Window objects that currently exist.
 static int g_active_window_count = 0;
@@ -126,7 +132,20 @@ bool Win32Window::CreateAndShow(const std::wstring& title,
     return false;
   }
 
-  return OnCreate();
+  if (!OnCreate()) {
+    return false;
+  }
+
+  if (close_to_tray_) {
+    taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
+    if (!AddTrayIcon()) {
+      // Do not hide the window if the tray icon could not be registered.
+      close_to_tray_ = false;
+      OutputDebugStringW(L"WSA PacMan: could not register notification-area icon.\\n");
+    }
+  }
+
+  return true;
 }
 
 // static
@@ -154,12 +173,66 @@ Win32Window::MessageHandler(HWND hwnd,
                             UINT const message,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
+  if (taskbar_created_message_ != 0 && message == taskbar_created_message_) {
+    tray_icon_added_ = false;
+    if (close_to_tray_) {
+      AddTrayIcon();
+    }
+    return 0;
+  }
+
   switch (message) {
+    case WM_CLOSE:
+      if (close_to_tray_ && tray_icon_added_ && !exit_requested_) {
+        ShowWindow(hwnd, SW_HIDE);
+        return 0;
+      }
+      break;
+
+    case WM_SYSCOMMAND:
+      // bitsdojo_window's CloseWindowButton sends SC_CLOSE directly.
+      if (close_to_tray_ && tray_icon_added_ && !exit_requested_ &&
+          (wparam & 0xFFF0) == SC_CLOSE) {
+        ShowWindow(hwnd, SW_HIDE);
+        return 0;
+      }
+      break;
+
     case WM_DESTROY:
+      RemoveTrayIcon();
       window_handle_ = nullptr;
       Destroy();
       if (quit_on_close_) {
         PostQuitMessage(0);
+      }
+      return 0;
+
+    case WM_COMMAND:
+      switch (LOWORD(wparam)) {
+        case kTrayShowCommand:
+          ShowFromTray();
+          return 0;
+        case kTrayExitCommand:
+          exit_requested_ = true;
+          close_to_tray_ = false;
+          RemoveTrayIcon();
+          if (window_handle_ != nullptr) {
+            DestroyWindow(window_handle_);
+          }
+          return 0;
+      }
+      break;
+
+    case kTrayCallbackMessage:
+      switch (lparam) {
+        case WM_LBUTTONUP:
+        case WM_LBUTTONDBLCLK:
+          ShowFromTray();
+          return 0;
+        case WM_RBUTTONUP:
+        case WM_CONTEXTMENU:
+          ShowTrayMenu();
+          return 0;
       }
       return 0;
 
@@ -174,6 +247,11 @@ Win32Window::MessageHandler(HWND hwnd,
       return 0;
     }
     case WM_SIZE: {
+      if (wparam == SIZE_MINIMIZED && close_to_tray_ && tray_icon_added_) {
+        ShowWindow(hwnd, SW_HIDE);
+        return 0;
+      }
+
       RECT rect = GetClientArea();
       if (child_content_ != nullptr) {
         // Size and position the child window.
@@ -194,6 +272,7 @@ Win32Window::MessageHandler(HWND hwnd,
 }
 
 void Win32Window::Destroy() {
+  RemoveTrayIcon();
   OnDestroy();
 
   if (window_handle_) {
@@ -233,6 +312,79 @@ HWND Win32Window::GetHandle() {
 
 void Win32Window::SetQuitOnClose(bool quit_on_close) {
   quit_on_close_ = quit_on_close;
+}
+
+void Win32Window::SetCloseToTray(bool close_to_tray) {
+  close_to_tray_ = close_to_tray;
+}
+
+bool Win32Window::AddTrayIcon() {
+  if (window_handle_ == nullptr) {
+    return false;
+  }
+  if (tray_icon_added_) {
+    return true;
+  }
+
+  NOTIFYICONDATAW icon_data = {};
+  icon_data.cbSize = sizeof(icon_data);
+  icon_data.hWnd = window_handle_;
+  icon_data.uID = kTrayIconId;
+  icon_data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+  icon_data.uCallbackMessage = kTrayCallbackMessage;
+  icon_data.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_APP_ICON));
+  if (icon_data.hIcon == nullptr) {
+    icon_data.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+  }
+  wcscpy_s(icon_data.szTip, L"WSA PacMan - running in background");
+
+  tray_icon_added_ = Shell_NotifyIconW(NIM_ADD, &icon_data) == TRUE;
+  return tray_icon_added_;
+}
+
+void Win32Window::RemoveTrayIcon() {
+  if (!tray_icon_added_) {
+    return;
+  }
+
+  NOTIFYICONDATAW icon_data = {};
+  icon_data.cbSize = sizeof(icon_data);
+  icon_data.hWnd = window_handle_;
+  icon_data.uID = kTrayIconId;
+  Shell_NotifyIconW(NIM_DELETE, &icon_data);
+  tray_icon_added_ = false;
+}
+
+void Win32Window::ShowFromTray() {
+  if (window_handle_ == nullptr) {
+    return;
+  }
+
+  ShowWindow(window_handle_, SW_RESTORE);
+  SetForegroundWindow(window_handle_);
+}
+
+void Win32Window::ShowTrayMenu() {
+  if (window_handle_ == nullptr || !tray_icon_added_) {
+    return;
+  }
+
+  HMENU menu = CreatePopupMenu();
+  if (menu == nullptr) {
+    return;
+  }
+
+  AppendMenuW(menu, MF_STRING, kTrayShowCommand, L"Open WSA PacMan");
+  AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+  AppendMenuW(menu, MF_STRING, kTrayExitCommand, L"Exit WSA PacMan");
+
+  POINT cursor = {};
+  GetCursorPos(&cursor);
+  SetForegroundWindow(window_handle_);
+  TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_BOTTOMALIGN,
+                 cursor.x, cursor.y, 0, window_handle_, nullptr);
+  PostMessageW(window_handle_, WM_NULL, 0, 0);
+  DestroyMenu(menu);
 }
 
 bool Win32Window::OnCreate() {
