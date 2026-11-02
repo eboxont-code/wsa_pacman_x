@@ -149,7 +149,7 @@ jobs:
             }
           }
           if ($trayHeader -notmatch "SetCloseToTray" -or
-              $trayMain -notmatch "SetCloseToTray\(is_main_manager_window\)" -or
+              $trayMain -notmatch "SetCloseToTray\(true\)" -or
               $trayCmake -notmatch "shell32") {
             throw "The WSA PacMan runner is not fully configured for notification-area support"
           }
