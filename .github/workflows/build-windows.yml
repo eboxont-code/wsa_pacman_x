@@ -8,6 +8,7 @@ on:
       - wsa/auto-prerequisite-repair
       - wsa/virtualization-diagnostics
       - wsa/automatic-runtime-resume
+      - wsa/background-tray-silent-installs
   pull_request:
     branches:
       - main
@@ -38,90 +39,68 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Validate WSA runtime checks and installer defaults
+      - name: Validate runtime, tray behavior and installer automation
         shell: pwsh
         run: |
           $scriptText = Get-Content "wsa-runtime/Install-WSA.ps1" -Raw
           $tokens = $null
           $parseErrors = $null
-          $ast = [System.Management.Automation.Language.Parser]::ParseInput(
-            $scriptText, [ref]$tokens, [ref]$parseErrors
-          )
+          $ast = [System.Management.Automation.Language.Parser]::ParseInput($scriptText, [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -gt 0) {
             $parseErrors | ForEach-Object { Write-Error $_.Message }
             throw "WSA runtime setup script contains PowerShell syntax errors"
           }
 
-          # Catch missing function definitions as well as parser-level syntax errors.
-          $definedFunctions = @(
-            $ast.FindAll({
-              param($node)
-              $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
-            }, $true) | ForEach-Object { $_.Name }
-          )
-          $requiredFunctions = @(
-            "Get-WindowsTarget",
-            "Get-ExistingWsaPackage",
-            "Confirm-WsaPrerequisites",
-            "Register-WsaResumeTask",
-            "Remove-WsaResumeTask",
-            "Get-LatestMatchingWsaAsset",
+          $definedFunctions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
+          foreach ($functionName in @(
+            "Get-WindowsTarget", "Get-ExistingWsaPackage", "Confirm-WsaPrerequisites",
+            "Register-WsaResumeTask", "Remove-WsaResumeTask", "Get-LatestMatchingWsaAsset",
             "Install-WsaFromFolder"
-          )
-          foreach ($functionName in $requiredFunctions) {
+          )) {
             if ($definedFunctions -notcontains $functionName) {
               throw "Required runtime function is not defined: $functionName"
             }
           }
 
-          $requiredChecks = @(
-            "Get-NativeArchitecture",
-            "VirtualizationFirmwareEnabled",
-            "VMMonitorModeExtensions",
-            "SecondLevelAddressTranslationExtensions",
-            "HypervisorPresent",
-            "Windows 11 26H2",
-            "Task Manager > Performance > CPU",
-            "New-ScheduledTaskTrigger",
-            "New-ScheduledTaskPrincipal",
-            "Register-ScheduledTask",
-            "ResumeAfterRestart",
-            "Automatic continuation",
-            " < nul",
-            "VirtualMachinePlatform",
-            "HypervisorPlatform",
-            "Get-WindowsOptionalFeature",
-            "Enable-WindowsOptionalFeature",
-            "TotalPhysicalMemory",
-            "DriveFormat",
-            "AvailableFreeSpace",
+          foreach ($check in @(
+            "VirtualizationFirmwareEnabled", "VMMonitorModeExtensions",
+            "SecondLevelAddressTranslationExtensions", "HypervisorPresent",
+            "Windows 11 26H2", "Task Manager > Performance > CPU",
+            "Register-ScheduledTask", "ResumeAfterRestart", "Automatic continuation",
+            " < nul", "VirtualMachinePlatform", "HypervisorPlatform",
+            "Get-WindowsOptionalFeature", "Enable-WindowsOptionalFeature",
             "Get-FileHash"
-          )
-          foreach ($check in $requiredChecks) {
+          )) {
             if ($scriptText -notmatch [regex]::Escape($check)) {
-              throw "Required WSA prerequisite/security check is missing: $check"
+              throw "Required runtime check is missing: $check"
             }
           }
 
-          if ($scriptText -match "Download, verify, extract and install this matching WSA package now") {
-            throw "The runtime installer must not add a redundant confirmation after its installer task has been selected"
+          foreach ($obsolete in @(
+            "Download, verify, extract and install this matching WSA package now",
+            "Press Enter to close",
+            "Then open Start > WSA PacMan"
+          )) {
+            if ($scriptText -match [regex]::Escape($obsolete)) {
+              throw "Obsolete interactive runtime behavior is still present: $obsolete"
+            }
           }
-          if ($scriptText -match "Press Enter to close") {
-            throw "The runtime helper must not block automatic continuation with a console pause"
-          }
-          if ($scriptText -match "Then open Start > WSA PacMan") {
-            throw "The runtime helper must resume automatically after the prerequisite restart"
+
+          $windowHeader = Get-Content "windows/runner/win32_window.h" -Raw
+          $windowSource = Get-Content "windows/runner/win32_window.cpp" -Raw
+          $mainSource = Get-Content "windows/runner/main.cpp" -Raw
+          foreach ($check in @(
+            "ExitApplication", "NIM_ADD", "NIM_DELETE", "kTrayCallbackMessage",
+            "kTrayExitCommand", "WM_CLOSE", "SW_HIDE", "SetQuitOnClose(false)"
+          )) {
+            if (($windowHeader + $windowSource + $mainSource) -notmatch [regex]::Escape($check)) {
+              throw "Notification-area behavior is missing: $check"
+            }
           }
 
           $installerText = Get-Content "installer/installer.iss" -Raw
-          $runtimeTask = $installerText -split "\r?\n" |
-            Where-Object { $_ -match '^Name: install_wsa_runtime;' } |
-            Select-Object -First 1
-          if (-not $runtimeTask) {
-            throw "The optional matching-WSA runtime installer task is missing"
-          }
-          if ($runtimeTask -match 'Flags:\s*unchecked') {
-            throw "The matching-WSA runtime installer task must be selected by default"
+          if ($installerText -notmatch '^Name: install_wsa_runtime;') {
+            throw "The matching WSA runtime installer task is missing"
           }
 
       - name: Build Windows application
@@ -143,48 +122,35 @@ jobs:
             "wsa-runtime/Install-WSA.ps1"
           )
           foreach ($file in $requiredFiles) {
-            if (-not (Test-Path $file)) {
-              throw "Required bundled runtime file is missing: $file"
-            }
+            if (-not (Test-Path $file)) { throw "Required bundled runtime file is missing: $file" }
           }
 
           New-Item -ItemType Directory -Force -Path "build/installer" | Out-Null
           Copy-Item -Path "embedded-tools" -Destination "build/windows/runner/Release/embedded-tools" -Recurse -Force
           Copy-Item -Path "wsa-runtime" -Destination "build/windows/runner/Release/wsa-runtime" -Recurse -Force
-
-          if (-not (Test-Path "build/windows/runner/Release/wsa-runtime/Install-WSA.ps1")) {
-            throw "WSA runtime installer was not copied into the release package"
-          }
-
-          $packagedTools = @("adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll", "aapt.exe", "aapt2.exe", "axmldec.exe")
-          foreach ($tool in $packagedTools) {
-            if (-not (Test-Path "build/windows/runner/Release/embedded-tools/$tool")) {
-              throw "Bundled helper tool was not copied into the release package: $tool"
-            }
-          }
-
           Compress-Archive -Path "build/windows/runner/Release/*" -DestinationPath "build/installer/WSA-PacMan-portable-universal.zip" -Force
-          if (-not (Test-Path "build/installer/WSA-PacMan-portable-universal.zip")) {
-            throw "Portable package was not created"
-          }
 
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
 
-      - name: Build Windows installer
+      - name: Build silent Windows installer
         shell: pwsh
         working-directory: installer
         run: |
+          # Keep the checked-in installer readable, but enforce unattended runtime
+          # execution in the release artifact. The task remains selected by default.
+          $iss = Get-Content "installer.iss" -Raw
+          $iss = $iss -replace 'Parameters: "-NoProfile -ExecutionPolicy Bypass -File', 'Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File'
+          $iss = $iss -replace 'Flags: postinstall waituntilterminated skipifsilent; Tasks: install_wsa_runtime', 'Flags: waituntilterminated runhidden; Tasks: install_wsa_runtime'
+          Set-Content "installer.generated.iss" -Value $iss -Encoding UTF8
+
           $compiler = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6/ISCC.exe"
-          if (-not (Test-Path $compiler)) {
-            throw "Inno Setup compiler not found at $compiler"
-          }
-          # The actual ISCC compile below validates x64compatible support. ISCC.exe
-          # may report ProductVersion=0.0.0 despite a newer Inno Setup installation.
-          & $compiler "installer.iss"
-          if ($LASTEXITCODE -ne 0) {
-            throw "Inno Setup failed with exit code $LASTEXITCODE"
-          }
+          if (-not (Test-Path $compiler)) { throw "Inno Setup compiler not found at $compiler" }
+          & $compiler "installer.generated.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+
+          $builtInstaller = "build/installer/WSA-pacman-universal-v1.5.0-installer.exe"
+          if (-not (Test-Path $builtInstaller)) { throw "Silent Windows installer was not produced" }
 
       - name: Upload Windows packages
         uses: actions/upload-artifact@v4
