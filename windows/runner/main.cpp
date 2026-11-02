@@ -51,12 +51,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
+  window.SetQuitOnClose(true);
+  // The main manager stays resident in the tray. APK/XAPK installer windows
+  // are launched with a file argument and should still close normally.
+  window.SetCloseToTray(command_line_arguments.empty());
+
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
   if (!window.CreateAndShow(L"wsa_pacman", origin, size)) {
     return EXIT_FAILURE;
   }
-  window.SetQuitOnClose(true);
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
