@@ -35,7 +35,7 @@ function Ensure-Administrator {
         if ($ResumeAfterRestart) {
             $arguments += ' -ResumeAfterRestart'
         }
-        Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs | Out-Null
+        Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden | Out-Null
         exit 0
     }
 }
@@ -59,7 +59,7 @@ function Register-WsaResumeTask {
     $userId = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $powershell = Join-Path $PSHOME 'powershell.exe'
     $scriptPath = '"' + $PSCommandPath + '"'
-    $arguments = '-NoProfile -ExecutionPolicy Bypass -File ' + $scriptPath + ' -ResumeAfterRestart'
+    $arguments = '-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File ' + $scriptPath + ' -ResumeAfterRestart'
 
     try {
         $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments -WorkingDirectory (Split-Path -Parent $PSCommandPath)
@@ -484,7 +484,7 @@ function Install-WsaFromFolder([string]$Folder) {
     # WSABuilds leaves its PowerShell window on a final "press any key" pause.
     # Redirect stdin from NUL so that non-interactive completion does not block.
     $argumentLine = '/d /c call "' + $runBatch.FullName + '" < nul'
-    $process = Start-Process -FilePath $env:ComSpec -ArgumentList $argumentLine -WorkingDirectory $workingDirectory -Wait -PassThru
+    $process = Start-Process -FilePath $env:ComSpec -ArgumentList $argumentLine -WorkingDirectory $workingDirectory -WindowStyle Hidden -Wait -PassThru
 
     if ($process.ExitCode -ne 0) {
         throw "The upstream WSA installer exited with code $($process.ExitCode). The extracted files were kept at $workingDirectory."
