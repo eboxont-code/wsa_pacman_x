@@ -21,8 +21,22 @@ function Write-WarningMessage([string]$Message) {
 }
 
 function Read-Confirmation([string]$Message) {
-    $answer = Read-Host "$Message [Y/N]"
-    return ($answer -match '^(?i)y(es)?$')
+    # Keep the helper console-free. Only hardware-virtualization ambiguity
+    # requires a human choice; present that choice as a normal Windows dialog.
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        $result = [System.Windows.Forms.MessageBox]::Show(
+            $Message,
+            'WSA PacMan prerequisite check',
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question
+        )
+        return ($result -eq [System.Windows.Forms.DialogResult]::Yes)
+    }
+    catch {
+        Write-WarningMessage "Could not display the prerequisite confirmation dialog. Setup will stop safely. $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Ensure-Administrator {
@@ -35,8 +49,18 @@ function Ensure-Administrator {
         if ($ResumeAfterRestart) {
             $arguments += ' -ResumeAfterRestart'
         }
-        Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs | Out-Null
-        exit 0
+        try {
+            $elevatedProcess = Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden -Wait -PassThru
+            if ($null -eq $elevatedProcess -or $elevatedProcess.ExitCode -ne 0) {
+                Write-WarningMessage 'The elevated WSA runtime setup did not complete successfully.'
+                exit 1
+            }
+            exit 0
+        }
+        catch {
+            Write-WarningMessage "Could not complete the elevated WSA runtime setup. $($_.Exception.Message)"
+            exit 1
+        }
     }
 }
 
@@ -59,7 +83,7 @@ function Register-WsaResumeTask {
     $userId = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $powershell = Join-Path $PSHOME 'powershell.exe'
     $scriptPath = '"' + $PSCommandPath + '"'
-    $arguments = '-NoProfile -ExecutionPolicy Bypass -File ' + $scriptPath + ' -ResumeAfterRestart'
+    $arguments = '-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File ' + $scriptPath + ' -ResumeAfterRestart'
 
     try {
         $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments -WorkingDirectory (Split-Path -Parent $PSCommandPath)
@@ -477,25 +501,117 @@ function Install-WsaFromFolder([string]$Folder) {
     }
 
     $workingDirectory = $runBatch.DirectoryName
+    $upstreamScript = Join-Path $workingDirectory 'Install.ps1'
+    if (-not (Test-Path -LiteralPath $upstreamScript -PathType Leaf)) {
+        throw "The extracted package did not contain Install.ps1 beside Run.bat. The files have been kept at $Folder for inspection."
+    }
+
     Write-Host ''
-    Write-Info "Starting the upstream WSA installer from $workingDirectory"
-    Write-WarningMessage 'Do not close the installer window while WSA is being registered.'
+    Write-Info 'Registering the WSA Android runtime in the background.'
+    Write-Info 'Running the upstream Install.ps1 directly; its Run.bat launcher opens a separate visible PowerShell window.'
 
-    # WSABuilds leaves its PowerShell window on a final "press any key" pause.
-    # Redirect stdin from NUL so that non-interactive completion does not block.
-    $argumentLine = '/d /c call "' + $runBatch.FullName + '" < nul'
-    $process = Start-Process -FilePath $env:ComSpec -ArgumentList $argumentLine -WorkingDirectory $workingDirectory -Wait -PassThru
+    $sourceText = Get-Content -LiteralPath $upstreamScript -Raw
+    if ($sourceText -notmatch '(?i)Add-AppxPackage\s+-ForceApplicationShutdown\s+-ForceUpdateFromAnyVersion\s+-Register\s+\.\\AppxManifest\.xml') {
+        throw "The upstream Install.ps1 has an unexpected structure. Refusing to patch or run an unrecognized installer. The original file was left untouched."
+    }
 
-    if ($process.ExitCode -ne 0) {
-        throw "The upstream WSA installer exited with code $($process.ExitCode). The extracted files were kept at $workingDirectory."
+    # Create a temporary sibling copy so all upstream relative paths remain valid.
+    # Keep the verified upstream Install.ps1 unchanged.
+    $unattendedScript = Join-Path $workingDirectory 'Install-WSA-PacMan-Unattended.ps1'
+    $logDirectory = Join-Path $env:ProgramData 'WSABuilds\Logs'
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    $logStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $stdoutLog = Join-Path $logDirectory ("WSA-Upstream-$logStamp.stdout.log")
+    $stderrLog = Join-Path $logDirectory ("WSA-Upstream-$logStamp.stderr.log")
+
+    # Upstream Finish() launches Magisk and Play Store after registering WSA.
+    # This helper selects a NoGApps package, so don't launch unrelated Android apps.
+    $finishPattern = '(?ims)^Function\s+Finish\s*\{.*?^\}'
+    if (-not [regex]::IsMatch($sourceText, $finishPattern)) {
+        throw 'The upstream installer has an unrecognized Finish() function. Refusing to launch unrelated Android apps automatically.'
+    }
+    $finishReplacement = 'Function Finish {' + [Environment]::NewLine +
+        "    Write-Output 'WSA runtime registration completed.'" + [Environment]::NewLine + '}'
+    $finishEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $finishReplacement
+    }
+    $sourceText = [regex]::Replace($sourceText, $finishPattern, $finishEvaluator)
+
+    # Upstream prompts for keypresses on completion and error branches. Remove
+    # the waits. An existing-install confirmation gets a null key, i.e. "No".
+    $readKeyPattern = '(?m)(\$[A-Za-z_][A-Za-z0-9_]*\s*=\s*)\$Host\.UI\.RawUI\.ReadKey\(''NoEcho,IncludeKeyDown''\);?'
+    $readKeyMatches = [regex]::Matches($sourceText, $readKeyPattern)
+    if ($readKeyMatches.Count -eq 0) {
+        throw 'The upstream installer no longer contains the expected keypress prompt pattern. Refusing to run an unverified unattended variant.'
+    }
+    $readKeyEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $match.Groups[1].Value + '$null'
+    }
+    $sourceText = [regex]::Replace($sourceText, $readKeyPattern, $readKeyEvaluator)
+    if ($sourceText -match '(?i)RawUI\.ReadKey\s*\(') {
+        throw 'The upstream installer contains an unrecognized interactive keypress prompt. Refusing to run it hidden because that could leave setup waiting indefinitely.'
+    }
+
+    # Never let the upstream error-recovery path uninstall an existing package.
+    $preservePattern = '(?ims)^ElseIf\s*\(\s*\$null\s*-Ne\s*\$Installed\s*\)\s*\{.*?^\}'
+    if (-not [regex]::IsMatch($sourceText, $preservePattern)) {
+        throw 'The upstream installer no longer has the expected existing-package recovery path. Refusing an unattended install until that path can be reviewed.'
+    }
+    $preserveReplacement = 'ElseIf ($null -Ne $Installed) {' + [Environment]::NewLine +
+        "    throw 'WSA registration failed while an existing package is present. PacMan will not uninstall or replace it.'" + [Environment]::NewLine + '}'
+    $preserveEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $preserveReplacement
+    }
+    $sourceText = [regex]::Replace($sourceText, $preservePattern, $preserveEvaluator)
+
+    # The outer PacMan helper is already elevated. Keep even an unexpected
+    # upstream self-elevation or conhost fallback hidden.
+    $sourceText = $sourceText.Replace(
+        'Start-Process -PassThru -Verb RunAs $pwsh -Args',
+        'Start-Process -PassThru -Verb RunAs -WindowStyle Hidden $pwsh -Args'
+    )
+    $sourceText = $sourceText.Replace(
+        'Start-Process conhost.exe -Args',
+        'Start-Process conhost.exe -WindowStyle Hidden -Args'
+    )
+
+    [System.IO.File]::WriteAllText(
+        $unattendedScript,
+        $sourceText,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+
+    try {
+        $powershell = Join-Path $PSHOME 'powershell.exe'
+        if (-not (Test-Path -LiteralPath $powershell -PathType Leaf)) {
+            throw "Windows PowerShell could not be found at $powershell."
+        }
+
+        $arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $unattendedScript + '"'
+        $process = Start-Process -FilePath $powershell -ArgumentList $arguments -WorkingDirectory $workingDirectory -WindowStyle Hidden -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -Wait -PassThru
+
+        if ($process.ExitCode -ne 0) {
+            $stderrTail = if (Test-Path -LiteralPath $stderrLog) {
+                (Get-Content -LiteralPath $stderrLog -Tail 20 -ErrorAction SilentlyContinue) -join ' '
+            } else { '' }
+            throw "The hidden upstream WSA registration process exited with code $($process.ExitCode). Details: $stderrTail. Logs: $stdoutLog and $stderrLog"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $unattendedScript -Force -ErrorAction SilentlyContinue
     }
 
     Start-Sleep -Seconds 3
     $registered = Get-ExistingWsaPackage
     if ($registered.Count -eq 0) {
-        throw "The upstream installer finished, but Windows did not report a registered WSA package. The extracted files were kept at $workingDirectory."
+        throw "The upstream installer finished, but Windows did not report a registered WSA package. Logs: $stdoutLog and $stderrLog. The original files were kept at $workingDirectory."
     }
 
+    Write-Info "Upstream installer output: $stdoutLog"
+    Write-Info "Upstream installer errors: $stderrLog"
     return $registered
 }
 
