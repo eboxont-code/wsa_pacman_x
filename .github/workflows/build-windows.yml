@@ -92,7 +92,7 @@ jobs:
             "RedirectStandardOutput",
             "RedirectStandardError",
             "System.Text.RegularExpressions.MatchEvaluator",
-            "RawUI\\.ReadKey",
+            "RawUI.ReadKey",
             "PacMan will not uninstall or replace it",
             "VirtualMachinePlatform",
             "HypervisorPlatform",
