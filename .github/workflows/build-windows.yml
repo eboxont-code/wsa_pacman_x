@@ -83,10 +83,8 @@ jobs:
           if (-not (Test-Path $compiler)) {
             throw "Inno Setup compiler not found at $compiler"
           }
-          $compilerVersion = [version](Get-Item -LiteralPath $compiler).VersionInfo.ProductVersion
-          if ($compilerVersion -lt [version]"6.3.2") {
-            throw "Inno Setup 6.3.2 or newer is required for x64-compatible Windows 11 ARM64 installs. Found $compilerVersion"
-          }
+          # The actual ISCC compile below validates x64compatible support. ISCC.exe
+          # may report ProductVersion=0.0.0 despite a newer Inno Setup installation.
           & $compiler "installer.iss"
           if ($LASTEXITCODE -ne 0) {
             throw "Inno Setup failed with exit code $LASTEXITCODE"
