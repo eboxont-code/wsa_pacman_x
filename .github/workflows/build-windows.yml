@@ -86,6 +86,7 @@ jobs:
             "New-ScheduledTaskTrigger",
             "New-ScheduledTaskPrincipal",
             "Register-ScheduledTask",
+            "-Verb RunAs -WindowStyle Hidden -Wait -PassThru",
             "ResumeAfterRestart",
             "Automatic continuation",
             "Install-WSA-PacMan-Unattended.ps1",
