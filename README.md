@@ -14,6 +14,17 @@ The Windows installer and portable package include the helper programs WSA PacMa
 
 **Windows Subsystem for Android (WSA) itself is a separate operating-system runtime and is not included.** WSA PacMan connects to an existing WSA installation; it does not download, replace or upgrade the Android system image. This avoids silently replacing an existing Android environment or risking its data. Install and start a compatible WSA distribution first, then launch WSA PacMan.
 
+## Windows architecture compatibility
+
+The same Windows installer is designed for:
+
+- **Windows 10/11 on Intel or AMD x64 PCs**.
+- **Windows 11 on ARM64 PCs** (including Snapdragon systems), using Windows' built-in x64 app emulation.
+
+The application and bundled ADB/AAPT/AAPT2/AXML helper programs are x64 binaries, not native ARM64 binaries. Windows 11 on ARM can run them through its built-in x64 emulation; no separate emulator download is needed. This is an architecture-compatible universal installer, not a native ARM64 build. Windows 10 on ARM does not provide x64 emulation and is not supported by this package.
+
+The WSA distribution itself is separate and must be compatible with the PC's processor architecture (x64 WSA on x64 PCs, ARM64 WSA on ARM64 PCs). WSA PacMan does not replace or convert the Android runtime.
+
 ## Settings
 
 - Appearance
