@@ -129,7 +129,7 @@ begin
 
   if ResultCode <> 0 then
   begin
-    Result := 'WSA PacMan could not stop its own ADB server. The installer will not skip or replace the locked ADB file. Close Android installations or ADB operations and retry.';
+    Result := 'WSA PacMan or its bundled ADB server is still running. Right-click the notification-area icon and choose Exit WSA PacMan, then close any Android install or ADB operation and run Setup again. No files were skipped or replaced.';
     Exit;
   end;
 end;
