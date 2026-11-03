@@ -9,6 +9,7 @@ on:
       - wsa/virtualization-diagnostics
       - wsa/automatic-runtime-resume
       - wsa/tray-background-silent-install
+      - wsa/stop-bundled-adb-before-upgrade
   pull_request:
     branches:
       - main
