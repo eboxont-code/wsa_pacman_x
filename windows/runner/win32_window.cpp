@@ -4,7 +4,6 @@
 
 #include "resource.h"
 #include <shellapi.h>
-#include <vector>
 
 namespace {
 
@@ -287,58 +286,6 @@ Win32Window::MessageHandler(HWND hwnd,
   return DefWindowProc(window_handle_, message, wparam, lparam);
 }
 
-void Win32Window::StopBundledAdbServer() {
-  std::vector<wchar_t> module_buffer(32768, L'\0');
-  const DWORD module_length = GetModuleFileNameW(
-      nullptr, module_buffer.data(), static_cast<DWORD>(module_buffer.size()));
-  if (module_length == 0 || module_length >= module_buffer.size()) {
-    OutputDebugStringW(L"WSA PacMan: could not resolve the installed executable path.\n");
-    return;
-  }
-
-  const std::wstring module_path(module_buffer.data(), module_length);
-  const size_t separator = module_path.find_last_of(L"\\/");
-  if (separator == std::wstring::npos) {
-    return;
-  }
-
-  const std::wstring install_directory = module_path.substr(0, separator + 1);
-  const std::wstring adb_path = install_directory + L"embedded-tools\\adb.exe";
-  if (GetFileAttributesW(adb_path.c_str()) == INVALID_FILE_ATTRIBUTES) {
-    return;
-  }
-
-  std::wstring command_line = L"\"" + adb_path + L"\" kill-server";
-  std::vector<wchar_t> mutable_command(command_line.begin(), command_line.end());
-  mutable_command.push_back(L'\0');
-
-  STARTUPINFOW startup_info{};
-  startup_info.cb = sizeof(startup_info);
-  startup_info.dwFlags = STARTF_USESHOWWINDOW;
-  startup_info.wShowWindow = SW_HIDE;
-
-  PROCESS_INFORMATION process_info{};
-  if (!CreateProcessW(adb_path.c_str(), mutable_command.data(), nullptr, nullptr,
-                      FALSE, CREATE_NO_WINDOW, nullptr, install_directory.c_str(),
-                      &startup_info, &process_info)) {
-    OutputDebugStringW(L"WSA PacMan: could not start its bundled ADB shutdown command.\n");
-    return;
-  }
-
-  const DWORD wait_result = WaitForSingleObject(process_info.hProcess, 10000);
-  if (wait_result != WAIT_OBJECT_0) {
-    OutputDebugStringW(L"WSA PacMan: bundled ADB shutdown did not finish within 10 seconds.\n");
-  } else {
-    DWORD exit_code = 1;
-    if (GetExitCodeProcess(process_info.hProcess, &exit_code) && exit_code != 0) {
-      OutputDebugStringW(L"WSA PacMan: bundled ADB shutdown returned an error.\n");
-    }
-  }
-
-  CloseHandle(process_info.hThread);
-  CloseHandle(process_info.hProcess);
-}
-
 void Win32Window::ExitApplication() {
   if (exit_requested_) {
     return;
@@ -347,7 +294,6 @@ void Win32Window::ExitApplication() {
   exit_requested_ = true;
   close_to_tray_ = false;
   RemoveTrayIcon();
-  StopBundledAdbServer();
 
   if (window_handle_ != nullptr) {
     DestroyWindow(window_handle_);
