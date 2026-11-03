@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 // A class abstraction for a high DPI-aware Win32 Window. Intended to be
 // inherited from by classes that wish to specialize with custom
@@ -87,6 +88,20 @@ class Win32Window {
 
   // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
+  static BOOL CALLBACK EnumerateWsaWindows(HWND window, LPARAM parameter);
+  static void CALLBACK WsaWindowEventCallback(HWINEVENTHOOK hook,
+                                              DWORD event,
+                                              HWND window,
+                                              LONG object_id,
+                                              LONG child_id,
+                                              DWORD event_thread,
+                                              DWORD event_time);
+
+  struct SavedWsaWindow {
+    HWND handle = nullptr;
+    DWORD process_id = 0;
+    WINDOWPLACEMENT placement{};
+  };
 
   bool quit_on_close_ = false;
   bool close_to_tray_ = false;
@@ -94,6 +109,19 @@ class Win32Window {
   bool exit_requested_ = false;
   UINT taskbar_created_message_ = 0;
   UINT update_shutdown_message_ = 0;
+  HWINEVENTHOOK wsa_window_event_hook_ = nullptr;
+  bool wsa_workspace_hidden_ = false;
+  std::wstring wsa_client_executable_path_;
+  std::vector<SavedWsaWindow> hidden_wsa_windows_;
+
+  std::wstring ResolveWsaClientExecutablePath();
+  std::wstring GetProcessImagePath(DWORD process_id);
+  bool IsWsaAppWindow(HWND window, DWORD* process_id = nullptr);
+  void InstallWsaWindowEventHook();
+  void RemoveWsaWindowEventHook();
+  void HideWsaAppWindow(HWND window);
+  void HideWsaAppWindows();
+  void RestoreWsaAppWindows();
 
   bool AddTrayIcon();
   void RemoveTrayIcon();
