@@ -146,12 +146,40 @@ jobs:
             }
           }
 
+          $stopAdbScript = Get-Content "installer/Stop-WSA-Adb.ps1" -Raw
+          $stopAdbTokens = $null
+          $stopAdbParseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseInput(
+            $stopAdbScript, [ref]$stopAdbTokens, [ref]$stopAdbParseErrors
+          ) | Out-Null
+          if ($stopAdbParseErrors.Count -gt 0) {
+            $stopAdbParseErrors | ForEach-Object { Write-Error $_.Message }
+            throw "Installer ADB shutdown script contains PowerShell syntax errors"
+          }
+          foreach ($check in @(
+            "Get-CimInstance -ClassName Win32_Process",
+            "ExecutablePath",
+            "OrdinalIgnoreCase",
+            "kill-server",
+            "AddSeconds(10)"
+          )) {
+            if ($stopAdbScript -notmatch [regex]::Escape($check)) {
+              throw "Required safe ADB shutdown behavior is missing: $check"
+            }
+          }
+
           $installerText = Get-Content "installer/installer.iss" -Raw
           if ($installerText -notmatch "Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime") {
             throw "The Android runtime helper must run hidden and finish before installer completion"
           }
           if ($installerText -match "skipifsilent") {
             throw "Silent Inno Setup installs must still run the selected Android runtime task"
+          }
+          if ($installerText -notmatch "CloseApplications=yes" -or
+              $installerText -notmatch "RestartApplications=no" -or
+              $installerText -notmatch "function PrepareToInstall" -or
+              $installerText -notmatch "Stop-WSA-Adb.ps1") {
+            throw "Installer must stop the bundled ADB server before the Restart Manager file-in-use check"
           }
 
           $traySource = Get-Content "windows/runner/win32_window.cpp" -Raw
@@ -217,6 +245,7 @@ jobs:
             "embedded-tools/aapt2.exe",
             "embedded-tools/axmldec.exe",
             "installer/redist/VC_redist.x64.exe",
+            "installer/Stop-WSA-Adb.ps1",
             "wsa-runtime/Install-WSA.ps1"
           )
           foreach ($file in $requiredFiles) {
