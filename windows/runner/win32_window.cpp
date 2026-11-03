@@ -17,7 +17,6 @@ constexpr UINT kTrayExitCommand = 0x5002;
 
 // The number of Win32Window objects that currently exist.
 static int g_active_window_count = 0;
-static Win32Window* g_wsa_window_manager = nullptr;
 
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 
@@ -195,48 +194,6 @@ BOOL CALLBACK Win32Window::EnumerateWsaWindows(HWND window,
   return TRUE;
 }
 
-void CALLBACK Win32Window::WsaWindowEventCallback(
-    HWINEVENTHOOK hook, DWORD event, HWND window, LONG object_id,
-    LONG child_id, DWORD event_thread, DWORD event_time) {
-  if (event != EVENT_OBJECT_SHOW || object_id != OBJID_WINDOW ||
-      child_id != 0 || window == nullptr) {
-    return;
-  }
-
-  // WSA can open Android app windows after PacMan has already been hidden
-  // (for example, from a Windows Start-menu shortcut). Keep those windows
-  // inside the hidden workspace too.
-  Win32Window* manager = g_wsa_window_manager;
-  if (manager != nullptr && manager->wsa_workspace_hidden_) {
-    manager->HideWsaAppWindow(window);
-  }
-}
-
-void Win32Window::InstallWsaWindowEventHook() {
-  if (wsa_window_event_hook_ != nullptr) {
-    return;
-  }
-
-  wsa_window_event_hook_ = SetWinEventHook(
-      EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW, nullptr,
-      &Win32Window::WsaWindowEventCallback, 0, 0,
-      WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
-  if (wsa_window_event_hook_ == nullptr) {
-    OutputDebugStringW(
-        L"WSA PacMan: could not monitor new Android app windows while hidden.\n");
-  }
-}
-
-void Win32Window::RemoveWsaWindowEventHook() {
-  if (wsa_window_event_hook_ != nullptr) {
-    UnhookWinEvent(wsa_window_event_hook_);
-    wsa_window_event_hook_ = nullptr;
-  }
-  if (g_wsa_window_manager == this) {
-    g_wsa_window_manager = nullptr;
-  }
-}
-
 void Win32Window::HideWsaAppWindow(HWND window) {
   if (!wsa_workspace_hidden_ || !IsWindowVisible(window)) {
     return;
@@ -391,7 +348,6 @@ Win32Window::Win32Window() {
 
 Win32Window::~Win32Window() {
   RestoreWsaAppWindows();
-  RemoveWsaWindowEventHook();
   --g_active_window_count;
   Destroy();
 }
@@ -595,7 +551,6 @@ void Win32Window::ExitApplication() {
   // Explicit Exit must not strand invisible Android apps. Return their
   // windows to the user before terminating the PacMan manager.
   RestoreWsaAppWindows();
-  RemoveWsaWindowEventHook();
   RemoveTrayIcon();
 
   if (window_handle_ != nullptr) {
@@ -650,13 +605,6 @@ void Win32Window::SetQuitOnClose(bool quit_on_close) {
 
 void Win32Window::SetCloseToTray(bool close_to_tray) {
   close_to_tray_ = close_to_tray;
-  if (close_to_tray_) {
-    g_wsa_window_manager = this;
-    InstallWsaWindowEventHook();
-  } else {
-    RestoreWsaAppWindows();
-    RemoveWsaWindowEventHook();
-  }
 }
 
 bool Win32Window::AddTrayIcon() {
