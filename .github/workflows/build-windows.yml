@@ -162,7 +162,11 @@ jobs:
             "ExecutablePath",
             "OrdinalIgnoreCase",
             "kill-server",
-            "AddSeconds(10)"
+            "AddSeconds(10)",
+            "Get-MatchingPacmanProcesses",
+            "AddSeconds(15)",
+            "WSA-pacman.exe",
+            "Right-click its notification-area icon"
           )) {
             if ($stopAdbScript -notmatch [regex]::Escape($check)) {
               throw "Required safe ADB shutdown behavior is missing: $check"
@@ -179,7 +183,9 @@ jobs:
           if ($installerText -notmatch "CloseApplications=yes" -or
               $installerText -notmatch "RestartApplications=no" -or
               $installerText -notmatch "function PrepareToInstall" -or
-              $installerText -notmatch "Stop-WSA-Adb.ps1") {
+              $installerText -notmatch "Stop-WSA-Adb.ps1" -or
+              $installerText -notmatch "RegisterWindowMessage" -or
+              $installerText -notmatch "PostMessage") {
             throw "Installer must stop the bundled ADB server before the Restart Manager file-in-use check"
           }
 
@@ -188,6 +194,9 @@ jobs:
           $trayMain = Get-Content "windows/runner/main.cpp" -Raw
           $trayCmake = Get-Content "windows/runner/CMakeLists.txt" -Raw
           $trayChecks = @(
+            "WSA.PacMan.PrepareForUpgrade.1",
+            "StopBundledAdbServer",
+            "ExitApplication",
             "Shell_NotifyIconW",
             "NIM_ADD",
             "NIM_DELETE",
