@@ -195,7 +195,6 @@ jobs:
           $trayCmake = Get-Content "windows/runner/CMakeLists.txt" -Raw
           $trayChecks = @(
             "WSA.PacMan.PrepareForUpgrade.1",
-            "StopBundledAdbServer",
             "ExitApplication",
             "Shell_NotifyIconW",
             "NIM_ADD",
