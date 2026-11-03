@@ -89,14 +89,6 @@ class Win32Window {
   // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
   static BOOL CALLBACK EnumerateWsaWindows(HWND window, LPARAM parameter);
-  static void CALLBACK WsaWindowEventCallback(HWINEVENTHOOK hook,
-                                              DWORD event,
-                                              HWND window,
-                                              LONG object_id,
-                                              LONG child_id,
-                                              DWORD event_thread,
-                                              DWORD event_time);
-
   struct SavedWsaWindow {
     HWND handle = nullptr;
     DWORD process_id = 0;
@@ -109,7 +101,6 @@ class Win32Window {
   bool exit_requested_ = false;
   UINT taskbar_created_message_ = 0;
   UINT update_shutdown_message_ = 0;
-  HWINEVENTHOOK wsa_window_event_hook_ = nullptr;
   bool wsa_workspace_hidden_ = false;
   std::wstring wsa_client_executable_path_;
   std::vector<SavedWsaWindow> hidden_wsa_windows_;
@@ -117,8 +108,6 @@ class Win32Window {
   std::wstring ResolveWsaClientExecutablePath();
   std::wstring GetProcessImagePath(DWORD process_id);
   bool IsWsaAppWindow(HWND window, DWORD* process_id = nullptr);
-  void InstallWsaWindowEventHook();
-  void RemoveWsaWindowEventHook();
   void HideWsaAppWindow(HWND window);
   void HideWsaAppWindows();
   void RestoreWsaAppWindows();
