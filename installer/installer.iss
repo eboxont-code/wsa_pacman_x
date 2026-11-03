@@ -39,6 +39,8 @@ ChangesAssociations=yes
 ChangesEnvironment=yes
 OutputBaseFilename={#dist_appname}-v{#SetupSetting("AppVersion")}-installer
 OutputDir={#instbuilddir}
+CloseApplications=yes
+RestartApplications=no
 
 [Tasks]
 Name: fileassoc_apk; Description: "{cm:AssocFileExtension,{#app_name},.apk}";
@@ -67,6 +69,7 @@ Root: HKCU; Subkey: "{#path_assoc_user}\.xapk\UserChoice"; ValueType: none; Flag
 [Files]
 Source: "{#releasedir}\*"; Excludes: "\*.lib,\*.exp,\{#tools_dir_name}"; DestDir: "{app}"; Flags: recursesubdirs
 Source: "{#toolsdir}\*"; DestDir: "{app}\{#tools_dir_name}"; Flags: recursesubdirs
+Source: "Stop-WSA-Adb.ps1"; Flags: dontcopy
 Source: ".\redist\VC_redist.x64.exe"; DestDir: {tmp}; Flags: dontcopy
 
 [Run]
@@ -85,6 +88,44 @@ Name: "{group}\Install matching WSA Android runtime"; \
   WorkingDir: "{app}\wsa-runtime"; IconFilename: "{app}\{#executable}"
 
 [Code]
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  AdbPath: String;
+  StopScriptPath: String;
+  PowerShellPath: String;
+  Parameters: String;
+  ResultCode: Integer;
+begin
+  Result := '';
+  AdbPath := ExpandConstant('{app}\\embedded-tools\\adb.exe');
+
+  // Fresh installs have no previous bundled ADB server to stop.
+  if not FileExists(AdbPath) then
+    Exit;
+
+  // This runs before Inno Setup's Restart Manager file-in-use check. Stop only
+  // an adb.exe process whose image path exactly matches this installation.
+  ExtractTemporaryFile('Stop-WSA-Adb.ps1');
+  StopScriptPath := ExpandConstant('{tmp}\\Stop-WSA-Adb.ps1');
+  PowerShellPath := ExpandConstant('{sys}\\WindowsPowerShell\\v1.0\\powershell.exe');
+  Parameters := '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' +
+    StopScriptPath + '" -ExpectedAdbPath "' + AdbPath + '"';
+
+  if not Exec(PowerShellPath, Parameters, ExpandConstant('{app}'), SW_HIDE,
+      ewWaitUntilTerminated, ResultCode) then
+  begin
+    Result := 'WSA PacMan could not start its hidden ADB shutdown check. Close WSA PacMan and retry. No files were replaced.';
+    Exit;
+  end;
+
+  if ResultCode <> 0 then
+  begin
+    Result := 'WSA PacMan could not stop its own ADB server. The installer will not skip or replace the locked ADB file. Close Android installations or ADB operations and retry.';
+    Exit;
+  end;
+end;
+
 function ShouldInstallVCRedist: Boolean;
 var 
   Version: String;
