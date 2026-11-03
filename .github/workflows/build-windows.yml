@@ -185,7 +185,7 @@ jobs:
               $installerText -notmatch "function PrepareToInstall" -or
               $installerText -notmatch "Stop-WSA-Adb.ps1" -or
               $installerText -notmatch "RegisterWindowMessage" -or
-              $installerText -notmatch "PostMessage") {
+              $installerText -notmatch "PostBroadcastMessage") {
             throw "Installer must stop the bundled ADB server before the Restart Manager file-in-use check"
           }
 
