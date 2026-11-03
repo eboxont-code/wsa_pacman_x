@@ -99,6 +99,7 @@ var
   ShutdownMessage: LongWord;
 begin
   Result := '';
+  NeedsRestart := False;
 
   // Ask a running PacMan manager to exit from the tray first. New versions
   // stop their own ADB server during this shutdown handshake.
