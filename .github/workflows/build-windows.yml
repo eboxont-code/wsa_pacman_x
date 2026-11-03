@@ -198,8 +198,6 @@ jobs:
             "WSA.PacMan.PrepareForUpgrade.1",
             "ExitApplication",
             "Shell_NotifyIconW",
-            "EVENT_OBJECT_SHOW",
-            "SetWinEventHook",
             "QueryFullProcessImageNameW",
             "GetWindowThreadProcessId",
             "EnumWindows",
@@ -231,7 +229,9 @@ jobs:
               -not $trayMain.Contains("SetCloseToTray(is_main_manager_window)") -or
               -not $trayMain.Contains("command_line_arguments.empty()") -or
               -not $trayCmake.Contains("shell32") -or
-              -not $trayCmake.Contains("advapi32")) {
+              -not $trayCmake.Contains("advapi32") -or
+              $traySource.Contains("SetWinEventHook") -or
+              $trayHeader.Contains("WsaWindowEventCallback")) {
             throw "The WSA PacMan main window is not fully configured for notification-area support"
           }
 
