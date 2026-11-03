@@ -236,8 +236,8 @@ jobs:
           }
 
           $wsaUtilsText = Get-Content "lib/utils/wsa_utils.dart" -Raw
-          if ($wsaUtilsText -notmatch "appWindow.minimize\(\)") {
-            throw "Launching an Android app from PacMan must hide the manager to the tray"
+          if ($wsaUtilsText -notmatch "appWindow.hide\(\)") {
+            throw "Launching an Android app from PacMan must hide only the manager so the newly launched app stays visible"
           }
 
           $installerText = Get-Content "installer/installer.iss" -Raw
