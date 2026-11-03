@@ -108,8 +108,8 @@ std::wstring Win32Window::ResolveWsaClientExecutablePath() {
   if (registered_path.rfind(system_root_prefix, 0) == 0) {
     wchar_t windows_directory[MAX_PATH + 1] = {};
     const UINT length = GetWindowsDirectoryW(
-        windows_directory, static_cast<UINT>(std::size(windows_directory)));
-    if (length == 0 || length >= std::size(windows_directory)) {
+        windows_directory, static_cast<UINT>(MAX_PATH + 1));
+    if (length == 0 || length >= MAX_PATH + 1) {
       return {};
     }
     registered_path = std::wstring(windows_directory) + L"\\" +
@@ -199,7 +199,7 @@ void CALLBACK Win32Window::WsaWindowEventCallback(
     HWINEVENTHOOK hook, DWORD event, HWND window, LONG object_id,
     LONG child_id, DWORD event_thread, DWORD event_time) {
   if (event != EVENT_OBJECT_SHOW || object_id != OBJID_WINDOW ||
-      child_id != CHILDID_SELF || window == nullptr) {
+      child_id != 0 || window == nullptr) {
     return;
   }
 
