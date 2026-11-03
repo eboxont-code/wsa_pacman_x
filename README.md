@@ -20,6 +20,10 @@ The default runtime choice is the upstream **NoGApps / NoAmazon** build. This om
 
 Microsoft ended official WSA support on 5 March 2025. These are community-maintained builds, not a Microsoft-supported Android subsystem. The latest available upstream LTS is still Android 13; this helper does not make Android 14/17 images available.
 
+## Upgrade and file-lock handling
+
+Before replacing an existing installation, Setup checks whether the old bundled `embedded-tools\adb.exe` is still running. It stops that ADB server only when Windows reports that the process image path exactly matches this WSA PacMan installation. It does not terminate unrelated ADB servers from Android Studio, SDK platform-tools, or other emulators. If the matching process cannot be stopped, Setup stops with a clear error instead of skipping or partially replacing the locked file.
+
 ## Background operation and sign-in compatibility
 
 On Windows, closing the main WSA PacMan window with the red **X** or using its minimize button hides it in the notification area instead of terminating the process. Left-click the tray icon to reopen PacMan; right-click it and choose **Exit WSA PacMan** to fully quit. Launching an Android app from the main PacMan manager hides the manager to the tray. Temporary APK/XAPK file-association installer windows keep their normal close behavior and do not add extra tray icons.
