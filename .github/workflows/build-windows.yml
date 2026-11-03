@@ -10,6 +10,7 @@ on:
       - wsa/automatic-runtime-resume
       - wsa/tray-background-silent-install
       - wsa/stop-bundled-adb-before-upgrade
+      - wsa/minimize-android-workspace-with-pacman
   pull_request:
     branches:
       - main
@@ -197,6 +198,17 @@ jobs:
             "WSA.PacMan.PrepareForUpgrade.1",
             "ExitApplication",
             "Shell_NotifyIconW",
+            "EVENT_OBJECT_SHOW",
+            "SetWinEventHook",
+            "QueryFullProcessImageNameW",
+            "GetWindowThreadProcessId",
+            "EnumWindows",
+            "WsaClient.exe",
+            "WsaService",
+            "HideWsaAppWindows",
+            "RestoreWsaAppWindows",
+            "SetWindowPlacement",
+            "ShowWindow(window, SW_HIDE)",
             "NIM_ADD",
             "NIM_DELETE",
             "TaskbarCreated",
@@ -204,7 +216,7 @@ jobs:
             "SC_CLOSE",
             "SIZE_MINIMIZED",
             "Exit WSA PacMan",
-            "Open WSA PacMan",
+            "Show Android workspace",
             "IsIconic(window_handle_)",
             "IsIconic(hwnd)",
             "tray_icon_added_ ? SW_HIDE : SW_MINIMIZE",
@@ -218,13 +230,14 @@ jobs:
           if (-not $trayHeader.Contains("SetCloseToTray") -or
               -not $trayMain.Contains("SetCloseToTray(is_main_manager_window)") -or
               -not $trayMain.Contains("command_line_arguments.empty()") -or
-              -not $trayCmake.Contains("shell32")) {
+              -not $trayCmake.Contains("shell32") -or
+              -not $trayCmake.Contains("advapi32")) {
             throw "The WSA PacMan main window is not fully configured for notification-area support"
           }
 
           $wsaUtilsText = Get-Content "lib/utils/wsa_utils.dart" -Raw
-          if ($wsaUtilsText -notmatch "appWindow.minimize\(\)") {
-            throw "Launching an Android app from PacMan must hide the manager to the tray"
+          if ($wsaUtilsText -notmatch "appWindow.hide\(\)") {
+            throw "Launching an Android app from PacMan must hide only the manager so the newly launched app stays visible"
           }
 
           $installerText = Get-Content "installer/installer.iss" -Raw

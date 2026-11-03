@@ -13,10 +13,12 @@ class WSAUtils {
   static bool launch([String? param]) => WinIO.run(ShellOp.OPEN, "shell:appsFolder\\${Env.WSA_INFO.familyName}!${Env.WSA_INFO.clientID}", param);
   static bool launchApp(String package) {
     final launched = launch("/launch wsa://$package");
-    // Starting an Android app should leave PacMan quietly available in the tray.
-    // Keep temporary APK-installer windows' existing close behavior unchanged.
+    // Launching an Android app hides only the PacMan manager so the newly
+    // launched Android window remains visible. A user-initiated minimize or
+    // close is handled natively as a request to hide the whole Android workspace.
+    // Temporary APK-installer windows keep their existing close behavior.
     if (launched && isDesktop && !Constants.installMode) {
-      appWindow.minimize();
+      appWindow.hide();
     }
     return launched;
   }
