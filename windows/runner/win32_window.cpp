@@ -136,6 +136,8 @@ bool Win32Window::CreateAndShow(const std::wstring& title,
     return false;
   }
 
+  update_shutdown_message_ = RegisterWindowMessageW(L"WSA.PacMan.PrepareForUpgrade.1");
+
   if (close_to_tray_) {
     taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
     if (!AddTrayIcon()) {
@@ -173,6 +175,11 @@ Win32Window::MessageHandler(HWND hwnd,
                             UINT const message,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
+  if (update_shutdown_message_ != 0 && message == update_shutdown_message_) {
+    ExitApplication();
+    return 0;
+  }
+
   if (taskbar_created_message_ != 0 && message == taskbar_created_message_) {
     tray_icon_added_ = false;
     if (close_to_tray_) {
@@ -226,12 +233,7 @@ Win32Window::MessageHandler(HWND hwnd,
           ShowFromTray();
           return 0;
         case kTrayExitCommand:
-          exit_requested_ = true;
-          close_to_tray_ = false;
-          RemoveTrayIcon();
-          if (window_handle_ != nullptr) {
-            DestroyWindow(window_handle_);
-          }
+          ExitApplication();
           return 0;
       }
       break;
@@ -282,6 +284,22 @@ Win32Window::MessageHandler(HWND hwnd,
   }
 
   return DefWindowProc(window_handle_, message, wparam, lparam);
+}
+
+void Win32Window::ExitApplication() {
+  if (exit_requested_) {
+    return;
+  }
+
+  exit_requested_ = true;
+  close_to_tray_ = false;
+  RemoveTrayIcon();
+
+  if (window_handle_ != nullptr) {
+    DestroyWindow(window_handle_);
+  } else if (quit_on_close_) {
+    PostQuitMessage(0);
+  }
 }
 
 void Win32Window::Destroy() {

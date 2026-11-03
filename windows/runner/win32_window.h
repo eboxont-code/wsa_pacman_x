@@ -93,11 +93,13 @@ class Win32Window {
   bool tray_icon_added_ = false;
   bool exit_requested_ = false;
   UINT taskbar_created_message_ = 0;
+  UINT update_shutdown_message_ = 0;
 
   bool AddTrayIcon();
   void RemoveTrayIcon();
   void ShowFromTray();
   void ShowTrayMenu();
+  void ExitApplication();
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;
