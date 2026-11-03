@@ -216,7 +216,7 @@ jobs:
             "SC_CLOSE",
             "SIZE_MINIMIZED",
             "Exit WSA PacMan",
-            "Open WSA PacMan",
+            "Show Android workspace",
             "IsIconic(window_handle_)",
             "IsIconic(hwnd)",
             "tray_icon_added_ ? SW_HIDE : SW_MINIMIZE",
