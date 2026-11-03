@@ -89,14 +89,6 @@ Name: "{group}\Install matching WSA Android runtime"; \
 
 [Code]
 
-const
-  WSA_HWND_BROADCAST = $FFFF;
-
-function RegisterWindowMessage(lpString: String): LongWord;
-  external 'RegisterWindowMessageW@user32.dll stdcall';
-function PostMessage(hWnd: HWND; Msg: LongWord; wParam: WPARAM; lParam: LPARAM): BOOL;
-  external 'PostMessageW@user32.dll stdcall';
-
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   AdbPath: String;
@@ -112,7 +104,7 @@ begin
   // stop their own ADB server during this shutdown handshake.
   ShutdownMessage := RegisterWindowMessage('WSA.PacMan.PrepareForUpgrade.1');
   if ShutdownMessage <> 0 then
-    PostMessage(WSA_HWND_BROADCAST, ShutdownMessage, 0, 0);
+    PostBroadcastMessage(ShutdownMessage, 0, 0);
 
   AdbPath := ExpandConstant('{app}\embedded-tools\adb.exe');
 
