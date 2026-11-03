@@ -99,7 +99,6 @@ class Win32Window {
   void RemoveTrayIcon();
   void ShowFromTray();
   void ShowTrayMenu();
-  void StopBundledAdbServer();
   void ExitApplication();
 
   // window handle for top level window.
