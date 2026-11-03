@@ -98,7 +98,7 @@ var
   ResultCode: Integer;
 begin
   Result := '';
-  AdbPath := ExpandConstant('{app}\\embedded-tools\\adb.exe');
+  AdbPath := ExpandConstant('{app}\embedded-tools\adb.exe');
 
   // Fresh installs have no previous bundled ADB server to stop.
   if not FileExists(AdbPath) then
@@ -107,8 +107,8 @@ begin
   // This runs before Inno Setup's Restart Manager file-in-use check. Stop only
   // an adb.exe process whose image path exactly matches this installation.
   ExtractTemporaryFile('Stop-WSA-Adb.ps1');
-  StopScriptPath := ExpandConstant('{tmp}\\Stop-WSA-Adb.ps1');
-  PowerShellPath := ExpandConstant('{sys}\\WindowsPowerShell\\v1.0\\powershell.exe');
+  StopScriptPath := ExpandConstant('{tmp}\Stop-WSA-Adb.ps1');
+  PowerShellPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
   Parameters := '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' +
     StopScriptPath + '" -ExpectedAdbPath "' + AdbPath + '"';
 
