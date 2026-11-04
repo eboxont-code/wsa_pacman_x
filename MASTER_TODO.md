@@ -66,6 +66,7 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ Windows installer produced and inspected.
 - ✅ Initial test installer supplied to the user.
 - ✅ Diagnostic installer and portable package built and inspected; portable package contains `WsaPacManAppTrayHook.dll`.
+- ✅ Reissued the installer as a root-level, simple-name attachment after the nested download link failed; SHA-256 verified unchanged.
 
 ### 4. Real-device validation
 
