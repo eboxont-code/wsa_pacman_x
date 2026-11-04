@@ -134,8 +134,11 @@ bool IsClosePending(HWND window) {
 extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCbtProc(
     int code, WPARAM wparam, LPARAM lparam) {
   if (code == HCBT_SYSCOMMAND) {
-    const HWND window = reinterpret_cast<HWND>(wparam);
-    if ((static_cast<UINT>(lparam) & 0xFFF0) == SC_CLOSE &&
+    // For HCBT_SYSCOMMAND, wParam is the SC_* command, not an HWND.
+    // This CBT hook is thread-specific, so GetActiveWindow returns the
+    // WSA app window receiving the close command on this thread.
+    const HWND window = GetActiveWindow();
+    if ((static_cast<UINT>(wparam) & 0xFFF0) == SC_CLOSE &&
         IsWsaClientWindow(window) && HideWindowToTray(window)) return 1;
   } else if (code == HCBT_DESTROYWND) {
     const HWND window = reinterpret_cast<HWND>(wparam);
