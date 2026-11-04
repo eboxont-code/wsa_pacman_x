@@ -2,15 +2,10 @@
 #define RUNNER_WIN32_WINDOW_H_
 
 #include <windows.h>
-
-#include <functional>
-#include <memory>
 #include <string>
-#include <vector>
+#include <unordered_map>
+#include <unordered_set>
 
-// A class abstraction for a high DPI-aware Win32 Window. Intended to be
-// inherited from by classes that wish to specialize with custom
-// rendering and input handling
 class Win32Window {
  public:
   struct Point {
@@ -18,81 +13,45 @@ class Win32Window {
     unsigned int y;
     Point(unsigned int x, unsigned int y) : x(x), y(y) {}
   };
-
   struct Size {
     unsigned int width;
     unsigned int height;
-    Size(unsigned int width, unsigned int height)
-        : width(width), height(height) {}
+    Size(unsigned int width, unsigned int height) : width(width), height(height) {}
   };
 
   Win32Window();
   virtual ~Win32Window();
-
-  // Creates and shows a win32 window with |title| and position and size using
-  // |origin| and |size|. New windows are created on the default monitor. Window
-  // sizes are specified to the OS in physical pixels, hence to ensure a
-  // consistent size to will treat the width height passed in to this function
-  // as logical pixels and scale to appropriate for the default monitor. Returns
-  // true if the window was created successfully.
-  bool CreateAndShow(const std::wstring& title,
-                     const Point& origin,
+  bool CreateAndShow(const std::wstring& title, const Point& origin,
                      const Size& size);
-
-  // Release OS resources associated with window.
   void Destroy();
-
-  // Inserts |content| into the window tree.
   void SetChildContent(HWND content);
-
-  // Returns the backing Window handle to enable clients to set icon and other
-  // window properties. Returns nullptr if the window has been destroyed.
   HWND GetHandle();
-
-  // If true, closing this window will quit the application.
   void SetQuitOnClose(bool quit_on_close);
-  // Keep the main WSA PacMan window running in the notification area when closed.
   void SetCloseToTray(bool close_to_tray);
-
-  // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
  protected:
-  // Processes and route salient window messages for mouse handling,
-  // size change and DPI. Delegates handling of these to member overloads that
-  // inheriting classes can handle.
-  virtual LRESULT MessageHandler(HWND window,
-                                 UINT const message,
+  virtual LRESULT MessageHandler(HWND window, UINT const message,
                                  WPARAM const wparam,
                                  LPARAM const lparam) noexcept;
-
-  // Called when CreateAndShow is called, allowing subclass window-related
-  // setup. Subclasses should return false if setup fails.
   virtual bool OnCreate();
-
-  // Called when Destroy is called.
   virtual void OnDestroy();
 
  private:
   friend class WindowClassRegistrar;
-
-  // OS callback called by message pump. Handles the WM_NCCREATE message which
-  // is passed when the non-client area is being created and enables automatic
-  // non-client DPI scaling so that the non-client area automatically
-  // responsponds to changes in DPI. All other messages are handled by
-  // MessageHandler.
-  static LRESULT CALLBACK WndProc(HWND const window,
-                                  UINT const message,
+  static LRESULT CALLBACK WndProc(HWND const window, UINT const message,
                                   WPARAM const wparam,
                                   LPARAM const lparam) noexcept;
-
-  // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
   static BOOL CALLBACK EnumerateWsaWindows(HWND window, LPARAM parameter);
-  struct SavedWsaWindow {
-    HWND handle = nullptr;
-    DWORD process_id = 0;
-    WINDOWPLACEMENT placement{};
+  static BOOL CALLBACK RestoreAppTrayWindowsBeforeExit(HWND window,
+                                                        LPARAM parameter);
+
+  struct WsaThreadHooks {
+    HHOOK cbt = nullptr;
+    HHOOK get_message = nullptr;
+    HHOOK call_wnd = nullptr;
+    HHOOK call_wnd_ret = nullptr;
   };
 
   bool quit_on_close_ = false;
@@ -101,16 +60,18 @@ class Win32Window {
   bool exit_requested_ = false;
   UINT taskbar_created_message_ = 0;
   UINT update_shutdown_message_ = 0;
-  bool wsa_workspace_hidden_ = false;
+  UINT_PTR hook_scan_timer_id_ = 0;
+  HMODULE app_tray_hook_module_ = nullptr;
   std::wstring wsa_client_executable_path_;
-  std::vector<SavedWsaWindow> hidden_wsa_windows_;
+  std::unordered_map<DWORD, WsaThreadHooks> wsa_thread_hooks_;
+  std::unordered_set<DWORD> failed_wsa_hook_threads_;
 
   std::wstring ResolveWsaClientExecutablePath();
   std::wstring GetProcessImagePath(DWORD process_id);
   bool IsWsaAppWindow(HWND window, DWORD* process_id = nullptr);
-  void HideWsaAppWindow(HWND window);
-  void HideWsaAppWindows();
-  void RestoreWsaAppWindows();
+  void InstallWsaAppHooks();
+  void InstallWsaAppHookForWindow(HWND window);
+  void RemoveWsaAppHooks();
 
   bool AddTrayIcon();
   void RemoveTrayIcon();
@@ -118,10 +79,7 @@ class Win32Window {
   void ShowTrayMenu();
   void ExitApplication();
 
-  // window handle for top level window.
   HWND window_handle_ = nullptr;
-
-  // window handle for hosted content.
   HWND child_content_ = nullptr;
 };
 

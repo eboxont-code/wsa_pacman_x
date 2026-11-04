@@ -194,6 +194,7 @@ jobs:
           $trayHeader = Get-Content "windows/runner/win32_window.h" -Raw
           $trayMain = Get-Content "windows/runner/main.cpp" -Raw
           $trayCmake = Get-Content "windows/runner/CMakeLists.txt" -Raw
+          $trayHookSource = Get-Content "windows/runner/app_tray_hook.cpp" -Raw
           $trayChecks = @(
             "WSA.PacMan.PrepareForUpgrade.1",
             "ExitApplication",
@@ -203,10 +204,14 @@ jobs:
             "EnumWindows",
             "WsaClient.exe",
             "WsaService",
-            "HideWsaAppWindows",
-            "RestoreWsaAppWindows",
-            "SetWindowPlacement",
-            "ShowWindow(window, SW_HIDE)",
+            "InstallWsaAppHooks",
+            "RemoveWsaAppHooks",
+            "SetWindowsHookExW",
+            "WH_CBT",
+            "WH_GETMESSAGE",
+            "WH_CALLWNDPROC",
+            "WH_CALLWNDPROCRET",
+            "WsaPacManAppTrayHook.dll",
             "NIM_ADD",
             "NIM_DELETE",
             "TaskbarCreated",
@@ -214,25 +219,42 @@ jobs:
             "SC_CLOSE",
             "SIZE_MINIMIZED",
             "Exit WSA PacMan",
-            "Show Android workspace",
-            "IsIconic(window_handle_)",
-            "IsIconic(hwnd)",
-            "tray_icon_added_ ? SW_HIDE : SW_MINIMIZE",
-            "notification-area icon could not be restored"
+            "Show WSA PacMan",
+            "tray_icon_added_ ? SW_HIDE : SW_MINIMIZE"
           )
           foreach ($check in $trayChecks) {
             if ($traySource -notmatch [regex]::Escape($check)) {
-              throw "Required native tray behavior is missing: $check"
+              throw "Required WSA per-app tray manager behavior is missing: $check"
+            }
+          }
+          $hookChecks = @(
+            "HCBT_SYSCOMMAND",
+            "HCBT_DESTROYWND",
+            "SC_CLOSE",
+            "WM_CLOSE",
+            "Shell_NotifyIconW",
+            "NIM_ADD",
+            "NIM_DELETE",
+            "SetWindowPlacement",
+            "ShowWindow(window, SW_HIDE)",
+            "kWsaAppTrayCallbackMessage",
+            "WsaAppTrayCallWndProc",
+            "WsaAppTrayCallWndRetProc"
+          )
+          foreach ($check in $hookChecks) {
+            if ($trayHookSource -notmatch [regex]::Escape($check)) {
+              throw "Per-app tray hook implementation is missing: $check"
             }
           }
           if (-not $trayHeader.Contains("SetCloseToTray") -or
               -not $trayMain.Contains("SetCloseToTray(is_main_manager_window)") -or
               -not $trayMain.Contains("command_line_arguments.empty()") -or
-              -not $trayCmake.Contains("shell32") -or
-              -not $trayCmake.Contains("advapi32") -or
-              $traySource.Contains("SetWinEventHook") -or
-              $trayHeader.Contains("WsaWindowEventCallback")) {
-            throw "The WSA PacMan main window is not fully configured for notification-area support"
+              -not $trayCmake.Contains("WsaPacManAppTrayHook") -or
+              -not $trayCmake.Contains("install(TARGETS WsaPacManAppTrayHook") -or
+              $traySource.Contains("HideWsaAppWindows") -or
+              $traySource.Contains("RestoreWsaAppWindows") -or
+              $traySource.Contains("SetWinEventHook")) {
+            throw "WSA app windows must use independent per-app tray hooks, not whole-workspace hiding"
           }
 
           $wsaUtilsText = Get-Content "lib/utils/wsa_utils.dart" -Raw
@@ -259,6 +281,7 @@ jobs:
         run: |
           $requiredFiles = @(
             "build/windows/runner/Release/WSA-pacman.exe",
+            "build/windows/runner/Release/WsaPacManAppTrayHook.dll",
             "build/windows/runner/Release/flutter_windows.dll",
             "embedded-tools/adb.exe",
             "embedded-tools/AdbWinApi.dll",

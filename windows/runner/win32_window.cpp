@@ -3,8 +3,10 @@
 #include <flutter_windows.h>
 
 #include "resource.h"
+#include "app_tray_hook.h"
 #include <shellapi.h>
 #include <algorithm>
+#include <vector>
 
 namespace {
 
@@ -185,105 +187,113 @@ bool Win32Window::IsWsaAppWindow(HWND window, DWORD* process_id) {
   return true;
 }
 
-BOOL CALLBACK Win32Window::EnumerateWsaWindows(HWND window,
-                                                LPARAM parameter) {
+BOOL CALLBACK Win32Window::EnumerateWsaWindows(HWND window, LPARAM parameter) {
   auto manager = reinterpret_cast<Win32Window*>(parameter);
-  if (manager != nullptr) {
-    manager->HideWsaAppWindow(window);
+  if (manager != nullptr) manager->InstallWsaAppHookForWindow(window);
+  return TRUE;
+}
+
+BOOL CALLBACK Win32Window::RestoreAppTrayWindowsBeforeExit(HWND window,
+                                                            LPARAM parameter) {
+  auto manager = reinterpret_cast<Win32Window*>(parameter);
+  if (manager != nullptr && manager->IsWsaAppWindow(window, nullptr)) {
+    DWORD_PTR result = 0;
+    SendMessageTimeoutW(window, kWsaAppTrayRestoreManagerMessage, 0, 0,
+                        SMTO_ABORTIFHUNG | SMTO_BLOCK, 500, &result);
   }
   return TRUE;
 }
 
-void Win32Window::HideWsaAppWindow(HWND window) {
-  if (!wsa_workspace_hidden_ || !IsWindowVisible(window)) {
+void Win32Window::InstallWsaAppHookForWindow(HWND window) {
+  if (!IsWsaAppWindow(window, nullptr)) return;
+  const DWORD thread_id = GetWindowThreadProcessId(window, nullptr);
+  if (thread_id == 0 || wsa_thread_hooks_.count(thread_id) != 0 ||
+      failed_wsa_hook_threads_.count(thread_id) != 0) return;
+
+  if (app_tray_hook_module_ == nullptr) {
+    wchar_t path[32768] = {};
+    const DWORD length = GetModuleFileNameW(nullptr, path,
+                                             static_cast<DWORD>(_countof(path)));
+    if (length == 0 || length >= _countof(path)) return;
+    std::wstring dll_path(path, length);
+    const size_t slash = dll_path.find_last_of(L"\\/");
+    if (slash == std::wstring::npos) return;
+    dll_path.resize(slash + 1);
+    dll_path += L"WsaPacManAppTrayHook.dll";
+    app_tray_hook_module_ = LoadLibraryW(dll_path.c_str());
+    if (app_tray_hook_module_ == nullptr) {
+      failed_wsa_hook_threads_.insert(thread_id);
+      OutputDebugStringW(L"WSA PacMan: per-app tray hook DLL could not be loaded.\n");
+      return;
+    }
+  }
+
+  const auto cbt = reinterpret_cast<HOOKPROC>(
+      GetProcAddress(app_tray_hook_module_, "WsaAppTrayCbtProc"));
+  const auto get_message = reinterpret_cast<HOOKPROC>(
+      GetProcAddress(app_tray_hook_module_, "WsaAppTrayGetMessageProc"));
+  const auto call_wnd = reinterpret_cast<HOOKPROC>(
+      GetProcAddress(app_tray_hook_module_, "WsaAppTrayCallWndProc"));
+  const auto call_wnd_ret = reinterpret_cast<HOOKPROC>(
+      GetProcAddress(app_tray_hook_module_, "WsaAppTrayCallWndRetProc"));
+  if (!cbt || !get_message || !call_wnd || !call_wnd_ret) {
+    failed_wsa_hook_threads_.insert(thread_id);
+    OutputDebugStringW(L"WSA PacMan: per-app tray hook DLL exports are incomplete.\n");
     return;
   }
 
-  DWORD process_id = 0;
-  if (!IsWsaAppWindow(window, &process_id)) {
+  WsaThreadHooks hooks;
+  hooks.cbt = SetWindowsHookExW(WH_CBT, cbt, app_tray_hook_module_, thread_id);
+  hooks.get_message = SetWindowsHookExW(WH_GETMESSAGE, get_message,
+                                         app_tray_hook_module_, thread_id);
+  hooks.call_wnd = SetWindowsHookExW(WH_CALLWNDPROC, call_wnd,
+                                      app_tray_hook_module_, thread_id);
+  hooks.call_wnd_ret = SetWindowsHookExW(WH_CALLWNDPROCRET, call_wnd_ret,
+                                          app_tray_hook_module_, thread_id);
+  if (!hooks.cbt || !hooks.get_message || !hooks.call_wnd || !hooks.call_wnd_ret) {
+    if (hooks.cbt) UnhookWindowsHookEx(hooks.cbt);
+    if (hooks.get_message) UnhookWindowsHookEx(hooks.get_message);
+    if (hooks.call_wnd) UnhookWindowsHookEx(hooks.call_wnd);
+    if (hooks.call_wnd_ret) UnhookWindowsHookEx(hooks.call_wnd_ret);
+    failed_wsa_hook_threads_.insert(thread_id);
+    OutputDebugStringW(L"WSA PacMan: Windows rejected a per-app tray hook.\n");
     return;
   }
-
-  const auto already_saved = std::find_if(
-      hidden_wsa_windows_.begin(), hidden_wsa_windows_.end(),
-      [window, process_id](const SavedWsaWindow& saved) {
-        return saved.handle == window && saved.process_id == process_id;
-      });
-  if (already_saved != hidden_wsa_windows_.end()) {
-    return;
-  }
-
-  SavedWsaWindow saved;
-  saved.handle = window;
-  saved.process_id = process_id;
-  saved.placement.length = sizeof(WINDOWPLACEMENT);
-  if (!GetWindowPlacement(window, &saved.placement)) {
-    OutputDebugStringW(
-        L"WSA PacMan: could not save an Android app window's placement.\n");
-    return;
-  }
-
-  hidden_wsa_windows_.push_back(saved);
-  ShowWindow(window, SW_HIDE);
+  wsa_thread_hooks_.emplace(thread_id, hooks);
 }
 
-void Win32Window::HideWsaAppWindows() {
-  if (wsa_workspace_hidden_) {
-    return;
-  }
-
+void Win32Window::InstallWsaAppHooks() {
+  if (!close_to_tray_) return;
   if (wsa_client_executable_path_.empty()) {
     wsa_client_executable_path_ = ResolveWsaClientExecutablePath();
   }
-  if (wsa_client_executable_path_.empty()) {
-    OutputDebugStringW(
-        L"WSA PacMan: WsaClient.exe could not be resolved; Android app windows were left unchanged.\n");
-    return;
-  }
-
-  wsa_workspace_hidden_ = true;
+  if (wsa_client_executable_path_.empty()) return;
   EnumWindows(&Win32Window::EnumerateWsaWindows,
               reinterpret_cast<LPARAM>(this));
 }
 
-void Win32Window::RestoreWsaAppWindows() {
-  if (!wsa_workspace_hidden_ && hidden_wsa_windows_.empty()) {
-    return;
+void Win32Window::RemoveWsaAppHooks() {
+  if (hook_scan_timer_id_ != 0 && window_handle_ != nullptr) {
+    KillTimer(window_handle_, hook_scan_timer_id_);
+    hook_scan_timer_id_ = 0;
   }
-
-  // Clear the hidden flag first so the WinEvent hook does not re-hide the
-  // windows while the saved placements are being restored.
-  wsa_workspace_hidden_ = false;
-
-  for (const SavedWsaWindow& saved : hidden_wsa_windows_) {
-    if (!IsWindow(saved.handle)) {
-      continue;
-    }
-
-    DWORD current_process_id = 0;
-    GetWindowThreadProcessId(saved.handle, &current_process_id);
-    if (current_process_id != saved.process_id ||
-        !IsWsaAppWindow(saved.handle, nullptr)) {
-      continue;
-    }
-
-    WINDOWPLACEMENT placement = saved.placement;
-    placement.length = sizeof(WINDOWPLACEMENT);
-    if (!SetWindowPlacement(saved.handle, &placement)) {
-      // Keep the app usable even if its prior placement could not be restored.
-      const int fallback_show_command =
-          placement.showCmd == SW_SHOWMAXIMIZED
-              ? SW_SHOWMAXIMIZED
-              : (placement.showCmd == SW_SHOWMINIMIZED ||
-                         placement.showCmd == SW_MINIMIZE ||
-                         placement.showCmd == SW_SHOWMINNOACTIVE
-                     ? SW_SHOWMINNOACTIVE
-                     : SW_SHOWNOACTIVATE);
-      ShowWindow(saved.handle, fallback_show_command);
-    }
+  if (app_tray_hook_module_ != nullptr && window_handle_ != nullptr) {
+    EnumWindows(&Win32Window::RestoreAppTrayWindowsBeforeExit,
+                reinterpret_cast<LPARAM>(this));
   }
-
-  hidden_wsa_windows_.clear();
+  for (const auto& entry : wsa_thread_hooks_) {
+    const WsaThreadHooks& hooks = entry.second;
+    if (hooks.call_wnd_ret) UnhookWindowsHookEx(hooks.call_wnd_ret);
+    if (hooks.call_wnd) UnhookWindowsHookEx(hooks.call_wnd);
+    if (hooks.get_message) UnhookWindowsHookEx(hooks.get_message);
+    if (hooks.cbt) UnhookWindowsHookEx(hooks.cbt);
+  }
+  wsa_thread_hooks_.clear();
+  failed_wsa_hook_threads_.clear();
+  if (app_tray_hook_module_ != nullptr) {
+    FreeLibrary(app_tray_hook_module_);
+    app_tray_hook_module_ = nullptr;
+  }
 }
 
 // Manages the Win32Window's window class registration.
@@ -347,7 +357,7 @@ Win32Window::Win32Window() {
 }
 
 Win32Window::~Win32Window() {
-  RestoreWsaAppWindows();
+  RemoveWsaAppHooks();
   --g_active_window_count;
   Destroy();
 }
@@ -385,10 +395,10 @@ bool Win32Window::CreateAndShow(const std::wstring& title,
   if (close_to_tray_) {
     taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
     if (!AddTrayIcon()) {
-      // Keep close-to-tray requested. Until the shell accepts the icon, close
-      // falls back to taskbar-minimize and TaskbarCreated will retry registration.
       OutputDebugStringW(L"WSA PacMan: could not register notification-area icon.\\n");
     }
+    InstallWsaAppHooks();
+    hook_scan_timer_id_ = SetTimer(window_handle_, 0xA11, 1000, nullptr);
   }
 
   return true;
@@ -446,7 +456,7 @@ Win32Window::MessageHandler(HWND hwnd,
   switch (message) {
     case WM_CLOSE:
       if (close_to_tray_ && !exit_requested_) {
-        HideWsaAppWindows();
+        
         // Hide only when the notification icon exists. Otherwise keep the
         // process alive in the taskbar until Explorer can register the icon.
         ShowWindow(hwnd, tray_icon_added_ ? SW_HIDE : SW_MINIMIZE);
@@ -458,13 +468,14 @@ Win32Window::MessageHandler(HWND hwnd,
       // bitsdojo_window's CloseWindowButton sends SC_CLOSE directly.
       if (close_to_tray_ && !exit_requested_ &&
           (wparam & 0xFFF0) == SC_CLOSE) {
-        HideWsaAppWindows();
+        
         ShowWindow(hwnd, tray_icon_added_ ? SW_HIDE : SW_MINIMIZE);
         return 0;
       }
       break;
 
     case WM_DESTROY:
+      RemoveWsaAppHooks();
       RemoveTrayIcon();
       window_handle_ = nullptr;
       Destroy();
@@ -509,7 +520,7 @@ Win32Window::MessageHandler(HWND hwnd,
     }
     case WM_SIZE: {
       if (wparam == SIZE_MINIMIZED && close_to_tray_) {
-        HideWsaAppWindows();
+        
         if (tray_icon_added_) {
           ShowWindow(hwnd, SW_HIDE);
         }
@@ -525,13 +536,14 @@ Win32Window::MessageHandler(HWND hwnd,
       return 0;
     }
 
-    case WM_ACTIVATE:
-      // If shell icon registration failed and PacMan was minimized to the
-      // taskbar instead, clicking its taskbar button restores the workspace.
-      if (LOWORD(wparam) != WA_INACTIVE && wsa_workspace_hidden_ &&
-          !tray_icon_added_) {
-        RestoreWsaAppWindows();
+    case WM_TIMER:
+      if (wparam == 0xA11) {
+        InstallWsaAppHooks();
+        return 0;
       }
+      break;
+
+    case WM_ACTIVATE:
       if (child_content_ != nullptr) {
         SetFocus(child_content_);
       }
@@ -550,7 +562,8 @@ void Win32Window::ExitApplication() {
   close_to_tray_ = false;
   // Explicit Exit must not strand invisible Android apps. Return their
   // windows to the user before terminating the PacMan manager.
-  RestoreWsaAppWindows();
+  
+  RemoveWsaAppHooks();
   RemoveTrayIcon();
 
   if (window_handle_ != nullptr) {
@@ -652,7 +665,7 @@ void Win32Window::ShowFromTray() {
   // Restore a minimized window, but use SW_SHOW for a window hidden
   // from the red X so an already-maximized window remains maximized.
   ShowWindow(window_handle_, IsIconic(window_handle_) ? SW_RESTORE : SW_SHOW);
-  RestoreWsaAppWindows();
+  
   SetForegroundWindow(window_handle_);
 }
 
@@ -666,7 +679,7 @@ void Win32Window::ShowTrayMenu() {
     return;
   }
 
-  AppendMenuW(menu, MF_STRING, kTrayShowCommand, L"Show Android workspace");
+  AppendMenuW(menu, MF_STRING, kTrayShowCommand, L"Show WSA PacMan");
   AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
   AppendMenuW(menu, MF_STRING, kTrayExitCommand, L"Exit WSA PacMan");
 
