@@ -33,7 +33,7 @@ void AppendTrayDiagnostic(const std::wstring& message) {
   }
   log_path += L"WsaPacMan-AppTray-Diagnostics.log";
 
-  HANDLE file = CreateFileW(log_path.c_str(), FILE_APPEND_DATA,
+  HANDLE file = CreateFileW(log_path.c_str(), GENERIC_READ | FILE_APPEND_DATA,
                             FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
                             OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file == INVALID_HANDLE_VALUE) return;
@@ -207,9 +207,6 @@ bool Win32Window::IsWsaAppWindow(HWND window, DWORD* process_id) {
 
   if (wsa_client_executable_path_.empty()) {
     wsa_client_executable_path_ = ResolveWsaClientExecutablePath();
-  }
-  if (wsa_client_executable_path_.empty()) {
-    return false;
   }
 
   const std::wstring image_path = GetProcessImagePath(pid);
