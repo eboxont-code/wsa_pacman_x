@@ -24,7 +24,7 @@
 
 ## Current task
 
-- ⏳ **Run diagnostic build and retrieve its log** — the matching fallback and diagnostics are built. Waiting for the user to test an Android app's X and share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log`.
+- 🔄 **Diagnose application launch failure in diagnostic build** — user reports the app does not open after installing/trying the diagnostic build. Determine whether WSA PacMan itself or an Android app fails to launch; inspect startup changes and build/package before issuing another installer.
 
 ## Project goal
 
@@ -71,7 +71,7 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 4. Real-device validation
 
 - ✅ User tested the earlier PR #12 build and reported that the WSA PacMan tray icon appeared, but no Android app tray icons appeared.
-- ⏳ Install the new diagnostic build supplied after CI #141.
+- ❌ Diagnostic build launch test reported failed by user: 'even the app is not opening'. Exact failing application (WSA PacMan manager vs Android app) is not yet distinguished; do not ask the user to install another build until diagnosed.
 - ⬜ Launch YouTube (or another WSA Android app), click that app window's X, and check whether its own icon appears.
 - ⬜ Share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` so we can identify whether discovery, hook registration, close interception, or icon creation is failing.
 - ⬜ Re-test all app behaviours after the underlying runtime issue is fixed.
@@ -125,3 +125,8 @@ Every Android app window running under WSA must behave independently in the Wind
 - PR head: `3c44440b72516bf5741986c621a69d5feb01bb89`.
 - Installer SHA-256: `47f63ec128666462bcbe67483338eb0841d552911cc21f54bace13386d49f0e2`.
 - Artifact ID: `13319523119`.
+
+
+### 2026-11-04 — Diagnostic build launch regression report
+- ❌ User reports the diagnostic build's app does not open.
+- 🔄 Current job: isolate whether the WSA PacMan manager or the Android app is failing to launch; inspect the diagnostic-only code changes and packaging.
