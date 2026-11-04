@@ -6,6 +6,8 @@
 
 ## Working rules
 
+0. **Shell instructions:** when guiding the user through PowerShell/CMD, provide only one single-line command per message. Never send multiline scripts or multiple commands to paste together. Wait for the command output before giving the next command.
+
 1. **Start every job here:** read this file, identify the next single task, and mark only that task as `🔄 WORKING` before changing code or project files.
 2. **One job at a time:** do not start another task until the current task is completed, verified, and recorded here.
 3. **End every job here:** record what changed, what was tested, the result, and any remaining blocker. Mark a task `✅ DONE` only when there is evidence; otherwise leave it `⏳ WAITING` or `❌ BLOCKED`.
