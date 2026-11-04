@@ -29,7 +29,7 @@ void AppendHookDiagnostic(const wchar_t* message) {
     log_path.push_back(L'\\');
   }
   log_path += L"WsaPacMan-AppTray-Diagnostics.log";
-  HANDLE file = CreateFileW(log_path.c_str(), FILE_APPEND_DATA,
+  HANDLE file = CreateFileW(log_path.c_str(), GENERIC_READ | FILE_APPEND_DATA,
                             FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
                             OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file == INVALID_HANDLE_VALUE) return;
@@ -38,7 +38,7 @@ void AppendHookDiagnostic(const wchar_t* message) {
   GetLocalTime(&now);
   wchar_t line[512] = {};
   const int length = swprintf_s(
-      line, L"[%04u-%02u-%02u %02u:%02u:%02u] HOOK: %s\\r\\n",
+      line, L"[%04u-%02u-%02u %02u:%02u:%02u] HOOK: %s\r\n",
       now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond,
       message);
   if (length > 0) {
