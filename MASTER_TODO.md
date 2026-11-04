@@ -26,7 +26,7 @@
 
 ## Current task
 
-- ⏳ **Verify Grass package state and Windows uninstall record** — the user needs to run the read-only diagnostic below. Confirm whether Android still has `io.getgrass.www` and whether Windows retains its per-app uninstall registry entry before making cleanup changes.
+- ⏳ **Restore WSA ADB availability and verify the Android Grass package** — ADB currently lists no connected WSA device, so Android package presence and launch behaviour cannot yet be checked. Keep this separate from the Windows Grass application.
 
 ## Project goal
 
@@ -74,7 +74,9 @@ Every Android app window running under WSA must behave independently in the Wind
 
 - ✅ User tested the earlier PR #12 build and reported that the WSA PacMan tray icon appeared, but no Android app tray icons appeared.
 - ❌ User clarified WSA PacMan itself is opening; the installed Android APK app (Grass) is the failing launch target.
-- ❌ Screenshot shows a Windows Installed apps row for Grass, version 3.6.1, publisher getgrass.io, size 146 MB, dated 4/11/2026, still present after uninstall. It is likely a WSA-generated uninstall registration, but the Android package state is not yet confirmed.
+- ✅ Identified the Windows Installed apps row as a separate Grass desktop application, not the Android APK: registry `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Grass`; DisplayVersion `8.1.0`; Publisher `Grass OpCo Ltd.`; InstallLocation `C:\Program Files\Grass`; DisplayIcon `C:\Program Files\Grass\grass.exe`; UninstallString points to its own uninstaller.
+- ✅ User explicitly instructed not to touch this separate Windows Grass application. Do not modify or remove its files, registry entries, or installation.
+- ⏳ The earlier screenshot listed Grass 3.6.1 / getgrass.io / 146 MB; whether that represented a distinct stale item or UI snapshot remains unverified. Do not infer it is the same registry entry.
 - ✅ Identified Grass 3.6.1 Android package ID as `io.getgrass.www`.
 - ✅ Source review confirms PacMan's Manage apps button launches Android's `ManageApplicationsActivity`; it does not implement Windows uninstall-registry cleanup.
 - ✅ Microsoft's WSA help identifies WSA Settings > Apps as the list of installed Android apps. WSA community docs report stale per-app uninstall entries can remain under HKCU Uninstall after normal Android uninstall.
@@ -146,8 +148,10 @@ Every Android app window running under WSA must behave independently in the Wind
 
 
 ### 2026-11-04 — Grass APK launch and uninstall-residue investigation
-- ✅ Static code and documentation review completed: PacMan exposes Android's Manage Applications screen; Grass package ID is `io.getgrass.www`; Windows may retain an uninstall registration after the Android package is removed.
-- ⏳ Next: user runs the read-only diagnostic below to capture Android package presence, WSA launch output, filtered Android logcat, and the matching Windows uninstall registration. Do not delete registry entries until the package state and exact matching key are confirmed.
+- ✅ Static code review completed: PacMan's Manage apps action opens Android's Manage Applications screen; Grass Android package ID is `io.getgrass.www`.
+- ✅ ADB lookup found the PacMan-bundled `adb.exe`, but `adb devices` returned no devices. The Android package query therefore failed with `no devices/emulators found`.
+- ✅ Identified the reported `Grass` registry key as a separate Windows desktop app (Grass 8.1.0 by Grass OpCo Ltd.) and explicitly excluded it from all cleanup.
+- ⏳ Next: restore WSA to a booted/ADB-connected state, then check the Android package and launch logs. Do not touch the separate Windows Grass application.
 - Evidence: user-provided Windows Installed apps screenshot shows Grass 3.6.1 / getgrass.io / 146 MB / 4/11/2026.
 
 
@@ -156,3 +160,11 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ Identified Grass Android package ID `io.getgrass.www` for version 3.6.1.
 - ✅ Research indicates WSA app uninstall records can remain in `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall` after normal Android uninstallation; this is separate from the Android package in WSA.
 - ⏳ Await read-only diagnostic output to distinguish an installed Android package from a stale Windows uninstall entry and capture Grass launch errors.
+
+
+### 2026-11-04 — Corrected Grass product identification
+- ✅ User clarified the Windows Grass application is different from the Android APK and must not be touched.
+- ✅ Registry evidence: Grass 8.1.0, publisher Grass OpCo Ltd., install path `C:\\Program Files\\Grass`, executable `grass.exe`, Windows uninstaller `uninstall.exe`.
+- ✅ Explicit safeguard: never uninstall, alter, or clean the separate Windows Grass application as part of WSA PacMan work.
+- ✅ ADB devices returned empty; Android-side state remains unknown.
+- ⏳ Next single task: restore WSA ADB connectivity, then verify the Android package `io.getgrass.www` separately.
