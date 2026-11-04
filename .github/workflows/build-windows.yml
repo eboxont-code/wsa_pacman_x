@@ -229,6 +229,7 @@ jobs:
           }
           $hookChecks = @(
             "HCBT_SYSCOMMAND",
+            "GetActiveWindow",
             "HCBT_DESTROYWND",
             "SC_CLOSE",
             "WM_CLOSE",
