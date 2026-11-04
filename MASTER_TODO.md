@@ -24,7 +24,7 @@
 
 ## Current task
 
-- 🔄 **Diagnose Grass APK launch and uninstall residue** — WSA PacMan itself opens; the installed Android app (Grass) will not launch, and Grass still appears in the shown Windows installed-apps list after PacMan uninstall. Trace install, launch, and uninstall behaviour before changing code.
+- ⏳ **Verify Grass package state and Windows uninstall record** — the user needs to run the read-only diagnostic below. Confirm whether Android still has `io.getgrass.www` and whether Windows retains its per-app uninstall registry entry before making cleanup changes.
 
 ## Project goal
 
@@ -72,7 +72,10 @@ Every Android app window running under WSA must behave independently in the Wind
 
 - ✅ User tested the earlier PR #12 build and reported that the WSA PacMan tray icon appeared, but no Android app tray icons appeared.
 - ❌ User clarified WSA PacMan itself is opening; the installed Android APK app (Grass) is the failing launch target.
-- ❌ Screenshot shows a Windows installed-apps row for Grass, version 3.6.1, publisher getgrass.io, size 146 MB, dated 4/11/2026, still present after uninstall through PacMan. Whether it is an actual WSA package, a Windows AppX registration, or a stale UI entry is not yet verified.
+- ❌ Screenshot shows a Windows Installed apps row for Grass, version 3.6.1, publisher getgrass.io, size 146 MB, dated 4/11/2026, still present after uninstall. It is likely a WSA-generated uninstall registration, but the Android package state is not yet confirmed.
+- ✅ Identified Grass 3.6.1 Android package ID as `io.getgrass.www`.
+- ✅ Source review confirms PacMan's Manage apps button launches Android's `ManageApplicationsActivity`; it does not implement Windows uninstall-registry cleanup.
+- ✅ Microsoft's WSA help identifies WSA Settings > Apps as the list of installed Android apps. WSA community docs report stale per-app uninstall entries can remain under HKCU Uninstall after normal Android uninstall.
 - ✅ Reviewed diagnostic-only code changes and confirmed CI #141 compiled and packaged successfully; this does not prove the installed app starts correctly.
 - ⬜ Launch YouTube (or another WSA Android app), click that app window's X, and check whether its own icon appears.
 - ⬜ Share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` so we can identify whether discovery, hook registration, close interception, or icon creation is failing.
@@ -141,5 +144,13 @@ Every Android app window running under WSA must behave independently in the Wind
 
 
 ### 2026-11-04 — Grass APK launch and uninstall-residue investigation
-- 🔄 Current single job: inspect PacMan's installed-app enumeration, APK launch, and uninstall implementation to determine why Grass will not open and why its entry remains visible after uninstall.
-- Evidence: user-provided Windows installed-apps screenshot shows Grass 3.6.1 / getgrass.io / 146 MB / 4/11/2026.
+- ✅ Static code and documentation review completed: PacMan exposes Android's Manage Applications screen; Grass package ID is `io.getgrass.www`; Windows may retain an uninstall registration after the Android package is removed.
+- ⏳ Next: user runs the read-only diagnostic below to capture Android package presence, WSA launch output, filtered Android logcat, and the matching Windows uninstall registration. Do not delete registry entries until the package state and exact matching key are confirmed.
+- Evidence: user-provided Windows Installed apps screenshot shows Grass 3.6.1 / getgrass.io / 146 MB / 4/11/2026.
+
+
+### 2026-11-04 — Grass investigation findings
+- ✅ Confirmed from PacMan source that the WSA screen's Manage apps action invokes Android `com.android.settings/.Settings$ManageApplicationsActivity`; no custom uninstall/registry mutation is implemented in that path.
+- ✅ Identified Grass Android package ID `io.getgrass.www` for version 3.6.1.
+- ✅ Research indicates WSA app uninstall records can remain in `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall` after normal Android uninstallation; this is separate from the Android package in WSA.
+- ⏳ Await read-only diagnostic output to distinguish an installed Android package from a stale Windows uninstall entry and capture Grass launch errors.
