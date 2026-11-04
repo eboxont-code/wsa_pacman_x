@@ -6,7 +6,7 @@
 
 ## Working rules
 
-0. **Shell instructions:** when guiding the user through PowerShell/CMD, provide only one single-line command per message. Never send multiline scripts or multiple commands to paste together. Wait for the command output before giving the next command.
+0. **Shell instructions:** every PowerShell/CMD command must be a single physical line. Multiple commands may be provided together, one command per line. Never use multiline commands, backtick continuations, or multiline scripts.
 
 1. **Start every job here:** read this file, identify the next single task, and mark only that task as `🔄 WORKING` before changing code or project files.
 2. **One job at a time:** do not start another task until the current task is completed, verified, and recorded here.
