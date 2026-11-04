@@ -168,4 +168,11 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ Registry evidence: Grass 8.1.0, publisher Grass OpCo Ltd., install path `C:\\Program Files\\Grass`, executable `grass.exe`, Windows uninstaller `uninstall.exe`.
 - ✅ Explicit safeguard: never uninstall, alter, or clean the separate Windows Grass application as part of WSA PacMan work.
 - ✅ ADB devices returned empty; Android-side state remains unknown.
-- ⏳ Next: inspect installed WSA AppX package registration and determine the correct launch entry point before starting the client.
+- ✅ Inspected installed WSA AppX registration: `MicrosoftCorporationII.WindowsSubsystemForAndroid_2407.40000.4.0_x64__8wekyb3d8bbwe`, status `Ok`, installed under `C:\\ProgramData\\WSABuilds\\WSA-Windows_11_2407.40000.4.0_LTS_8\\WSA_2407.40000.4.0_x64`.
+- ⏳ Next: read the registered WSA application's actual AppX Application ID and launch entry point; start WSA using that registered identity.
+
+
+### 2026-11-04 — WSA AppX registration confirmed
+- ✅ `Get-AppxPackage` confirms WSA package version `2407.40000.4.0`, architecture x64, status `Ok`, at `C:\\ProgramData\\WSABuilds\\WSA-Windows_11_2407.40000.4.0_LTS_8\\WSA_2407.40000.4.0_x64`.
+- ✅ `WsaService` remains running, but `WsaClient.exe` was not running in the latest process snapshot.
+- ⏳ Next: inspect the WSA AppX manifest for the actual Application ID/Executable, then launch by registered package family/application ID.
