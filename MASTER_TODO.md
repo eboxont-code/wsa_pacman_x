@@ -150,6 +150,7 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 2026-11-04 — Grass APK launch and uninstall-residue investigation
 - ✅ Static code review completed: PacMan's Manage apps action opens Android's Manage Applications screen; Grass Android package ID is `io.getgrass.www`.
 - ✅ ADB lookup found the PacMan-bundled `adb.exe`, but `adb devices` returned no devices. The Android package query therefore failed with `no devices/emulators found`.
+- ✅ Latest service check: `WsaService` is `Running` with `Manual` start type, but `Get-Process WsaClient` returned no process. The WSA service is up while the WSA client/UI is not currently running.
 - ✅ Identified the reported `Grass` registry key as a separate Windows desktop app (Grass 8.1.0 by Grass OpCo Ltd.) and explicitly excluded it from all cleanup.
 - ⏳ Next: restore WSA to a booted/ADB-connected state, then check the Android package and launch logs. Do not touch the separate Windows Grass application.
 - Evidence: user-provided Windows Installed apps screenshot shows Grass 3.6.1 / getgrass.io / 146 MB / 4/11/2026.
@@ -167,4 +168,4 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ Registry evidence: Grass 8.1.0, publisher Grass OpCo Ltd., install path `C:\\Program Files\\Grass`, executable `grass.exe`, Windows uninstaller `uninstall.exe`.
 - ✅ Explicit safeguard: never uninstall, alter, or clean the separate Windows Grass application as part of WSA PacMan work.
 - ✅ ADB devices returned empty; Android-side state remains unknown.
-- ⏳ Next single task: restore WSA ADB connectivity, then verify the Android package `io.getgrass.www` separately.
+- ⏳ Next: inspect installed WSA AppX package registration and determine the correct launch entry point before starting the client.
