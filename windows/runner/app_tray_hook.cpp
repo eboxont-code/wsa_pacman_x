@@ -4,6 +4,7 @@
 #include <cwchar>
 #include <unordered_map>
 #include <unordered_set>
+#include <cstdint>
 
 namespace {
 struct SavedWindow {
@@ -15,6 +16,37 @@ struct SavedWindow {
 SRWLOCK g_lock = SRWLOCK_INIT;
 std::unordered_map<HWND, SavedWindow> g_hidden;
 std::unordered_set<HWND> g_pending_close;
+
+void AppendHookDiagnostic(const wchar_t* message) {
+  wchar_t temp_path[MAX_PATH + 1] = {};
+  const DWORD path_length =
+      GetTempPathW(static_cast<DWORD>(_countof(temp_path)), temp_path);
+  if (path_length == 0 || path_length >= _countof(temp_path)) return;
+
+  std::wstring log_path(temp_path, path_length);
+  if (log_path.back() != L'\\' && log_path.back() != L'/') {
+    log_path.push_back(L'\\');
+  }
+  log_path += L"WsaPacMan-AppTray-Diagnostics.log";
+  HANDLE file = CreateFileW(log_path.c_str(), FILE_APPEND_DATA,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                            OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) return;
+
+  SYSTEMTIME now{};
+  GetLocalTime(&now);
+  wchar_t line[512] = {};
+  const int length = swprintf_s(
+      line, L"[%04u-%02u-%02u %02u:%02u:%02u] HOOK: %s\\r\\n",
+      now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond,
+      message);
+  if (length > 0) {
+    DWORD written = 0;
+    WriteFile(file, line, static_cast<DWORD>(length * sizeof(wchar_t)),
+              &written, nullptr);
+  }
+  CloseHandle(file);
+}
 
 bool IsWsaClientWindow(HWND window) {
   if (window == nullptr || !IsWindow(window) ||
@@ -45,7 +77,14 @@ void DeleteTrayIcon(HWND window) {
 }
 
 bool HideWindowToTray(HWND window) {
-  if (!IsWsaClientWindow(window) || !IsWindowVisible(window)) return false;
+  if (!IsWsaClientWindow(window)) {
+    AppendHookDiagnostic(L"Hide request rejected: window process is not WsaClient.exe.");
+    return false;
+  }
+  if (!IsWindowVisible(window)) {
+    AppendHookDiagnostic(L"Hide request rejected: WsaClient window is not visible.");
+    return false;
+  }
 
   AcquireSRWLockShared(&g_lock);
   const bool already_hidden = g_hidden.find(window) != g_hidden.end();
@@ -86,9 +125,11 @@ bool HideWindowToTray(HWND window) {
   wcsncpy_s(data.szTip, title, _TRUNCATE);
 
   if (!Shell_NotifyIconW(NIM_ADD, &data)) {
+    AppendHookDiagnostic(L"Shell_NotifyIconW(NIM_ADD) failed for an Android app window.");
     if (saved.owns_icon && saved.icon != nullptr) DestroyIcon(saved.icon);
     return false;
   }
+  AppendHookDiagnostic(L"Per-app notification icon successfully added.");
 
   AcquireSRWLockExclusive(&g_lock);
   g_hidden[window] = saved;
@@ -138,8 +179,15 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCbtProc(
     // This CBT hook is thread-specific, so GetActiveWindow returns the
     // WSA app window receiving the close command on this thread.
     const HWND window = GetActiveWindow();
-    if ((static_cast<UINT>(wparam) & 0xFFF0) == SC_CLOSE &&
-        IsWsaClientWindow(window) && HideWindowToTray(window)) return 1;
+    if ((static_cast<UINT>(wparam) & 0xFFF0) == SC_CLOSE) {
+      AppendHookDiagnostic(L"WH_CBT received SC_CLOSE.");
+      if (IsWsaClientWindow(window)) {
+        if (HideWindowToTray(window)) return 1;
+        AppendHookDiagnostic(L"SC_CLOSE was seen, but the app window could not be hidden.");
+      } else {
+        AppendHookDiagnostic(L"SC_CLOSE target was not recognized as WsaClient.exe.");
+      }
+    }
   } else if (code == HCBT_DESTROYWND) {
     const HWND window = reinterpret_cast<HWND>(wparam);
     if (IsClosePending(window)) {
@@ -176,6 +224,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCallWndProc(
       RestoreWindowFromTray(message->hwnd);
     } else if (message->message == WM_CLOSE &&
                IsWsaClientWindow(message->hwnd)) {
+      AppendHookDiagnostic(L"WH_CALLWNDPROC received WM_CLOSE for WsaClient window.");
       AcquireSRWLockExclusive(&g_lock);
       g_pending_close.insert(message->hwnd);
       ReleaseSRWLockExclusive(&g_lock);
