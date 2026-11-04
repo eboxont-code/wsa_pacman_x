@@ -20,10 +20,11 @@
 - ⏳ **WAITING** — waiting for a user test, decision, dependency, or external action
 - ⬜ **NOT STARTED** — not yet begun
 - ❌ **BLOCKED** — cannot proceed; reason must be recorded
+- ❌ **FAILED** — a test was performed and the expected behaviour did not occur
 
 ## Current task
 
-- ⏳ **Real-device validation of PR #12** — waiting for the user to install and test the supplied Windows build. This is the next single task.
+- 🔄 **Diagnose missing per-app tray icons** — the user's real-device test shows the WSA/PacMan icon, but no Android app icons. Find why app windows are not registering with the per-app tray hook.
 
 ## Project goal
 
@@ -52,7 +53,7 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ Remove the previous workspace-wide hide/restore approach from this implementation.
 - ✅ Add the hook DLL to the Windows build/package.
 - ✅ Add CI regression checks for the hook and package contents.
-- ⏳ Verify the Windows hook can actually attach to WSA app UI threads on the user's installation.
+- ❌ FAILED in observed runtime test: WSA/PacMan is visible in the tray, but Android app tray icons are not appearing. Hook attachment/registration is not yet proven.
 
 ### 3. Build and packaging
 
@@ -64,8 +65,10 @@ Every Android app window running under WSA must behave independently in the Wind
 
 ### 4. Real-device validation
 
-- ⬜ Install the PR #12 test build on the Windows/WSA machine.
-- ⬜ Open YouTube and YouTube Music together.
+- ✅ User installed and launched the PR #12 test build; the WSA/PacMan icon is visible in the Windows notification overflow.
+- ❌ Android app tray icons do not appear in the user's test; this is the current failure to diagnose.
+- ⬜ Re-test after the hook-registration issue is fixed.
+- ⬜ Open YouTube and YouTube Music together and capture diagnostic output for both WsaClient windows.
 - ⬜ Click YouTube's X — only YouTube hides.
 - ⬜ Confirm YouTube has its own notification-area tray icon (including under the `^` overflow if Windows places it there).
 - ⬜ Click YouTube's tray icon — only YouTube restores.
@@ -102,4 +105,5 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 2026-11-04
 - ✅ Created this persistent master checklist on the PR #12 branch.
 - ✅ Confirmed PR #12 is open and the checklist did not previously exist on that branch.
-- ⏳ Next: real-device validation of the supplied test installer.
+- ❌ User's first real-device test: the WSA/PacMan tray icon appears, but no per-app Android icons appear.
+- 🔄 Current job: diagnose why the per-app hook is not discovering/hooking Android app windows or adding their icons.
