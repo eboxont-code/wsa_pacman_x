@@ -7,6 +7,7 @@
 #include <shellapi.h>
 #include <algorithm>
 #include <vector>
+#include <sstream>
 
 namespace {
 
@@ -19,6 +20,44 @@ constexpr UINT kTrayExitCommand = 0x5002;
 
 // The number of Win32Window objects that currently exist.
 static int g_active_window_count = 0;
+
+void AppendTrayDiagnostic(const std::wstring& message) {
+  wchar_t temp_path[MAX_PATH + 1] = {};
+  const DWORD path_length =
+      GetTempPathW(static_cast<DWORD>(_countof(temp_path)), temp_path);
+  if (path_length == 0 || path_length >= _countof(temp_path)) return;
+
+  std::wstring log_path(temp_path, path_length);
+  if (log_path.back() != L'\\' && log_path.back() != L'/') {
+    log_path.push_back(L'\\');
+  }
+  log_path += L"WsaPacMan-AppTray-Diagnostics.log";
+
+  HANDLE file = CreateFileW(log_path.c_str(), FILE_APPEND_DATA,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                            OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) return;
+
+  LARGE_INTEGER file_size{};
+  if (GetFileSizeEx(file, &file_size) && file_size.QuadPart == 0) {
+    const wchar_t bom = 0xFEFF;
+    DWORD written = 0;
+    WriteFile(file, &bom, sizeof(bom), &written, nullptr);
+  }
+
+  SYSTEMTIME now{};
+  GetLocalTime(&now);
+  wchar_t timestamp[64] = {};
+  swprintf_s(timestamp, L"[%04u-%02u-%02u %02u:%02u:%02u] ",
+             now.wYear, now.wMonth, now.wDay,
+             now.wHour, now.wMinute, now.wSecond);
+  const std::wstring line = std::wstring(timestamp) + message + L"\r\n";
+  DWORD written = 0;
+  WriteFile(file, line.data(),
+            static_cast<DWORD>(line.size() * sizeof(wchar_t)),
+            &written, nullptr);
+  CloseHandle(file);
+}
 
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 
@@ -174,11 +213,28 @@ bool Win32Window::IsWsaAppWindow(HWND window, DWORD* process_id) {
   }
 
   const std::wstring image_path = GetProcessImagePath(pid);
-  if (image_path.empty() ||
+  if (image_path.empty()) return false;
+
+  // Match the WSA client by executable name so versioned WindowsApps paths
+  // cannot silently exclude its app windows after a package update.
+  const size_t image_name_start = image_path.find_last_of(L"\\/");
+  const wchar_t* image_name = image_name_start == std::wstring::npos
+                                  ? image_path.c_str()
+                                  : image_path.c_str() + image_name_start + 1;
+  if (CompareStringOrdinal(image_name, -1, L"WsaClient.exe", -1, TRUE) !=
+      CSTR_EQUAL) {
+    return false;
+  }
+
+  if (!wsa_client_executable_path_.empty() &&
       CompareStringOrdinal(image_path.c_str(), -1,
                            wsa_client_executable_path_.c_str(), -1, TRUE) !=
           CSTR_EQUAL) {
-    return false;
+    std::wstringstream diagnostic;
+    diagnostic << L"WSA process accepted by executable name; path differs. "
+               << L"Expected=" << wsa_client_executable_path_
+               << L"; actual=" << image_path;
+    AppendTrayDiagnostic(diagnostic.str());
   }
 
   if (process_id != nullptr) {
@@ -187,9 +243,35 @@ bool Win32Window::IsWsaAppWindow(HWND window, DWORD* process_id) {
   return true;
 }
 
+void Win32Window::LogWindowDiagnostic(HWND window) {
+  if (window == nullptr || !IsWindow(window) || !IsWindowVisible(window) ||
+      !diagnosed_windows_.insert(window).second) {
+    return;
+  }
+
+  DWORD process_id = 0;
+  const DWORD thread_id = GetWindowThreadProcessId(window, &process_id);
+  const std::wstring image_path =
+      process_id == 0 ? std::wstring() : GetProcessImagePath(process_id);
+  wchar_t title[256] = {};
+  wchar_t class_name[256] = {};
+  GetWindowTextW(window, title, static_cast<int>(_countof(title)));
+  GetClassNameW(window, class_name, static_cast<int>(_countof(class_name)));
+
+  std::wstringstream diagnostic;
+  diagnostic << L"Visible top-level window: PID=" << process_id
+             << L" TID=" << thread_id << L" HWND=" << window
+             << L" class=" << class_name << L" title=" << title
+             << L" image=" << (image_path.empty() ? L"<unavailable>" : image_path);
+  AppendTrayDiagnostic(diagnostic.str());
+}
+
 BOOL CALLBACK Win32Window::EnumerateWsaWindows(HWND window, LPARAM parameter) {
   auto manager = reinterpret_cast<Win32Window*>(parameter);
-  if (manager != nullptr) manager->InstallWsaAppHookForWindow(window);
+  if (manager != nullptr) {
+    manager->LogWindowDiagnostic(window);
+    manager->InstallWsaAppHookForWindow(window);
+  }
   return TRUE;
 }
 
@@ -205,7 +287,8 @@ BOOL CALLBACK Win32Window::RestoreAppTrayWindowsBeforeExit(HWND window,
 }
 
 void Win32Window::InstallWsaAppHookForWindow(HWND window) {
-  if (!IsWsaAppWindow(window, nullptr)) return;
+  DWORD process_id = 0;
+  if (!IsWsaAppWindow(window, &process_id)) return;
   const DWORD thread_id = GetWindowThreadProcessId(window, nullptr);
   if (thread_id == 0 || wsa_thread_hooks_.count(thread_id) != 0 ||
       failed_wsa_hook_threads_.count(thread_id) != 0) return;
@@ -222,6 +305,11 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
     dll_path += L"WsaPacManAppTrayHook.dll";
     app_tray_hook_module_ = LoadLibraryW(dll_path.c_str());
     if (app_tray_hook_module_ == nullptr) {
+      const DWORD error = GetLastError();
+      std::wstringstream diagnostic;
+      diagnostic << L"Could not load app tray hook DLL: " << dll_path
+                 << L"; Win32 error=" << error;
+      AppendTrayDiagnostic(diagnostic.str());
       failed_wsa_hook_threads_.insert(thread_id);
       OutputDebugStringW(L"WSA PacMan: per-app tray hook DLL could not be loaded.\n");
       return;
@@ -237,19 +325,45 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
   const auto call_wnd_ret = reinterpret_cast<HOOKPROC>(
       GetProcAddress(app_tray_hook_module_, "WsaAppTrayCallWndRetProc"));
   if (!cbt || !get_message || !call_wnd || !call_wnd_ret) {
+    AppendTrayDiagnostic(L"App tray hook DLL exports are incomplete.");
     failed_wsa_hook_threads_.insert(thread_id);
     OutputDebugStringW(L"WSA PacMan: per-app tray hook DLL exports are incomplete.\n");
     return;
   }
 
   WsaThreadHooks hooks;
+  SetLastError(ERROR_SUCCESS);
   hooks.cbt = SetWindowsHookExW(WH_CBT, cbt, app_tray_hook_module_, thread_id);
+  const DWORD cbt_error = hooks.cbt ? ERROR_SUCCESS : GetLastError();
+  SetLastError(ERROR_SUCCESS);
   hooks.get_message = SetWindowsHookExW(WH_GETMESSAGE, get_message,
                                          app_tray_hook_module_, thread_id);
+  const DWORD get_message_error =
+      hooks.get_message ? ERROR_SUCCESS : GetLastError();
+  SetLastError(ERROR_SUCCESS);
   hooks.call_wnd = SetWindowsHookExW(WH_CALLWNDPROC, call_wnd,
                                       app_tray_hook_module_, thread_id);
+  const DWORD call_wnd_error =
+      hooks.call_wnd ? ERROR_SUCCESS : GetLastError();
+  SetLastError(ERROR_SUCCESS);
   hooks.call_wnd_ret = SetWindowsHookExW(WH_CALLWNDPROCRET, call_wnd_ret,
                                           app_tray_hook_module_, thread_id);
+  const DWORD call_wnd_ret_error =
+      hooks.call_wnd_ret ? ERROR_SUCCESS : GetLastError();
+
+  std::wstringstream hook_diagnostic;
+  hook_diagnostic << L"Hook registration PID=" << process_id
+                  << L" TID=" << thread_id
+                  << L" CBT=" << (hooks.cbt ? L"OK" : L"FAIL")
+                  << L"/" << cbt_error
+                  << L" GETMESSAGE=" << (hooks.get_message ? L"OK" : L"FAIL")
+                  << L"/" << get_message_error
+                  << L" CALLWND=" << (hooks.call_wnd ? L"OK" : L"FAIL")
+                  << L"/" << call_wnd_error
+                  << L" CALLWNDRET=" << (hooks.call_wnd_ret ? L"OK" : L"FAIL")
+                  << L"/" << call_wnd_ret_error;
+  AppendTrayDiagnostic(hook_diagnostic.str());
+
   if (!hooks.cbt || !hooks.get_message || !hooks.call_wnd || !hooks.call_wnd_ret) {
     if (hooks.cbt) UnhookWindowsHookEx(hooks.cbt);
     if (hooks.get_message) UnhookWindowsHookEx(hooks.get_message);
@@ -267,7 +381,20 @@ void Win32Window::InstallWsaAppHooks() {
   if (wsa_client_executable_path_.empty()) {
     wsa_client_executable_path_ = ResolveWsaClientExecutablePath();
   }
-  if (wsa_client_executable_path_.empty()) return;
+
+  static std::wstring last_logged_expected_path;
+  if (last_logged_expected_path != wsa_client_executable_path_) {
+    std::wstringstream diagnostic;
+    diagnostic << L"Expected WsaClient path="
+               << (wsa_client_executable_path_.empty()
+                       ? L"<unresolved>"
+                       : wsa_client_executable_path_);
+    AppendTrayDiagnostic(diagnostic.str());
+    last_logged_expected_path = wsa_client_executable_path_;
+  }
+
+  // Always enumerate: a versioned package path mismatch must not prevent
+  // matching the actual WsaClient.exe process by its executable name.
   EnumWindows(&Win32Window::EnumerateWsaWindows,
               reinterpret_cast<LPARAM>(this));
 }
