@@ -24,7 +24,7 @@
 
 ## Current task
 
-- 🔄 **Diagnose application launch failure in diagnostic build** — user reports the app does not open after installing/trying the diagnostic build. Determine whether WSA PacMan itself or an Android app fails to launch; inspect startup changes and build/package before issuing another installer.
+- ⏳ **Identify the failing launch target** — user reports 'the app is not opening', but it is not yet clear whether this means the Windows WSA PacMan manager or an Android app inside WSA. Do not issue another build until this is identified.
 
 ## Project goal
 
@@ -71,7 +71,8 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 4. Real-device validation
 
 - ✅ User tested the earlier PR #12 build and reported that the WSA PacMan tray icon appeared, but no Android app tray icons appeared.
-- ❌ Diagnostic build launch test reported failed by user: 'even the app is not opening'. Exact failing application (WSA PacMan manager vs Android app) is not yet distinguished; do not ask the user to install another build until diagnosed.
+- ❌ Diagnostic build launch test reported failed by user: 'even the app is not opening'. Exact failing application (WSA PacMan manager, installer, or Android app) is not yet distinguished.
+- ✅ Reviewed diagnostic-only code changes and confirmed CI #141 compiled and packaged successfully; this does not prove the installed app starts correctly.
 - ⬜ Launch YouTube (or another WSA Android app), click that app window's X, and check whether its own icon appears.
 - ⬜ Share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` so we can identify whether discovery, hook registration, close interception, or icon creation is failing.
 - ⬜ Re-test all app behaviours after the underlying runtime issue is fixed.
@@ -130,3 +131,9 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 2026-11-04 — Diagnostic build launch regression report
 - ❌ User reports the diagnostic build's app does not open.
 - 🔄 Current job: isolate whether the WSA PacMan manager or the Android app is failing to launch; inspect the diagnostic-only code changes and packaging.
+
+
+### 2026-11-04 — Launch failure triage
+- ❌ User reports the app will not open after the diagnostic build attempt.
+- ✅ Reviewed diagnostic patch and CI #141 result; no compile/package failure was reported.
+- ⏳ Waiting to identify which target fails (installer, WSA PacMan Windows manager, or Android app) before selecting a rollback or code fix.
