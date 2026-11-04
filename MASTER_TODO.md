@@ -24,7 +24,7 @@
 
 ## Current task
 
-- ⏳ **Identify the failing launch target** — user reports 'the app is not opening', but it is not yet clear whether this means the Windows WSA PacMan manager or an Android app inside WSA. Do not issue another build until this is identified.
+- 🔄 **Diagnose Grass APK launch and uninstall residue** — WSA PacMan itself opens; the installed Android app (Grass) will not launch, and Grass still appears in the shown Windows installed-apps list after PacMan uninstall. Trace install, launch, and uninstall behaviour before changing code.
 
 ## Project goal
 
@@ -71,7 +71,8 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 4. Real-device validation
 
 - ✅ User tested the earlier PR #12 build and reported that the WSA PacMan tray icon appeared, but no Android app tray icons appeared.
-- ❌ Diagnostic build launch test reported failed by user: 'even the app is not opening'. Exact failing application (WSA PacMan manager, installer, or Android app) is not yet distinguished.
+- ❌ User clarified WSA PacMan itself is opening; the installed Android APK app (Grass) is the failing launch target.
+- ❌ Screenshot shows a Windows installed-apps row for Grass, version 3.6.1, publisher getgrass.io, size 146 MB, dated 4/11/2026, still present after uninstall through PacMan. Whether it is an actual WSA package, a Windows AppX registration, or a stale UI entry is not yet verified.
 - ✅ Reviewed diagnostic-only code changes and confirmed CI #141 compiled and packaged successfully; this does not prove the installed app starts correctly.
 - ⬜ Launch YouTube (or another WSA Android app), click that app window's X, and check whether its own icon appears.
 - ⬜ Share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` so we can identify whether discovery, hook registration, close interception, or icon creation is failing.
@@ -137,3 +138,8 @@ Every Android app window running under WSA must behave independently in the Wind
 - ❌ User reports the app will not open after the diagnostic build attempt.
 - ✅ Reviewed diagnostic patch and CI #141 result; no compile/package failure was reported.
 - ⏳ Waiting to identify which target fails (installer, WSA PacMan Windows manager, or Android app) before selecting a rollback or code fix.
+
+
+### 2026-11-04 — Grass APK launch and uninstall-residue investigation
+- 🔄 Current single job: inspect PacMan's installed-app enumeration, APK launch, and uninstall implementation to determine why Grass will not open and why its entry remains visible after uninstall.
+- Evidence: user-provided Windows installed-apps screenshot shows Grass 3.6.1 / getgrass.io / 146 MB / 4/11/2026.
