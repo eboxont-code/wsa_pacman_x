@@ -2,6 +2,7 @@
 
 #include <shellapi.h>
 #include <cwchar>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <cstdint>
