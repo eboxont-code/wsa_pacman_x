@@ -24,7 +24,7 @@
 
 ## Current task
 
-- 🔄 **Diagnose missing per-app tray icons** — the user's real-device test shows the WSA/PacMan icon, but no Android app icons. Find why app windows are not registering with the per-app tray hook.
+- ⏳ **Run diagnostic build and retrieve its log** — the matching fallback and diagnostics are built. Waiting for the user to test an Android app's X and share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log`.
 
 ## Project goal
 
@@ -53,21 +53,27 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ Remove the previous workspace-wide hide/restore approach from this implementation.
 - ✅ Add the hook DLL to the Windows build/package.
 - ✅ Add CI regression checks for the hook and package contents.
-- ❌ FAILED in observed runtime test: WSA/PacMan is visible in the tray, but Android app tray icons are not appearing. Hook attachment/registration is not yet proven.
+- ✅ Added executable-name fallback for `WsaClient.exe`, so versioned or unresolved WindowsApps paths no longer stop discovery.
+- ✅ Added a runtime diagnostics log for visible top-level windows, hook installation results, close-hook events, and per-app `Shell_NotifyIconW(NIM_ADD)` results.
+- ⏳ Actual runtime hook attachment and per-app tray behaviour remain unverified; the diagnostic build is ready for user testing.
 
 ### 3. Build and packaging
 
 - ✅ Windows CI build completed for PR #12.
-- ✅ CI workflow run #133 passed for PR head `7990601beee46e9ca8e8b56710903dde0d7452fb`.
+- ✅ CI workflow run #133 passed for the initial PR head `7990601beee46e9ca8e8b56710903dde0d7452fb`.
+- ✅ Diagnostic Windows build CI run #141 passed for PR head `3c44440b72516bf5741986c621a69d5feb01bb89`.
 - ✅ Portable package produced and inspected.
 - ✅ Windows installer produced and inspected.
-- ✅ Test installer supplied to the user.
+- ✅ Initial test installer supplied to the user.
+- ✅ Diagnostic installer and portable package built and inspected; portable package contains `WsaPacManAppTrayHook.dll`.
 
 ### 4. Real-device validation
 
-- ✅ User installed and launched the PR #12 test build; the WSA/PacMan icon is visible in the Windows notification overflow.
-- ❌ Android app tray icons do not appear in the user's test; this is the current failure to diagnose.
-- ⬜ Re-test after the hook-registration issue is fixed.
+- ✅ User tested the earlier PR #12 build and reported that the WSA PacMan tray icon appeared, but no Android app tray icons appeared.
+- ⏳ Install the new diagnostic build supplied after CI #141.
+- ⬜ Launch YouTube (or another WSA Android app), click that app window's X, and check whether its own icon appears.
+- ⬜ Share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` so we can identify whether discovery, hook registration, close interception, or icon creation is failing.
+- ⬜ Re-test all app behaviours after the underlying runtime issue is fixed.
 - ⬜ Open YouTube and YouTube Music together and capture diagnostic output for both WsaClient windows.
 - ⬜ Click YouTube's X — only YouTube hides.
 - ⬜ Confirm YouTube has its own notification-area tray icon (including under the `^` overflow if Windows places it there).
@@ -95,15 +101,26 @@ Every Android app window running under WSA must behave independently in the Wind
 
 - PR #12 is open and targets `main`.
 - PR branch: `wsa/per-app-tray-icons`.
-- PR head at checklist creation: `7990601beee46e9ca8e8b56710903dde0d7452fb`.
-- Latest known CI run: [#133](https://github.com/eboxont-code/wsa_pacman_x/actions/runs/41821575957), successful.
+- Current PR head: `3c44440b72516bf5741986c621a69d5feb01bb89`.
+- Latest CI run: [#141](https://github.com/eboxont-code/wsa_pacman_x/actions/runs/41826799475), successful.
+- Diagnostic artifact ID: `13319523119`; expires 2026-11-18.
+- Diagnostic installer SHA-256: `47f63ec128666462bcbe67483338eb0841d552911cc21f54bace13386d49f0e2`.
+- Diagnostic artifact ZIP SHA-256: `84b0adcced9346deee96644fdcea06a0fc6ffec13388d14abb4a3c915bb6847d`.
 - CI success confirms build/package validation; **it does not prove runtime behaviour on the user's WSA installation**.
-- The supplied test installer is for validation only. PR #12 has not been merged.
+- PR #12 has not been merged.
 
 ## Work log
 
 ### 2026-11-04
 - ✅ Created this persistent master checklist on the PR #12 branch.
 - ✅ Confirmed PR #12 is open and the checklist did not previously exist on that branch.
-- ❌ User's first real-device test: the WSA/PacMan tray icon appears, but no per-app Android icons appear.
-- 🔄 Current job: diagnose why the per-app hook is not discovering/hooking Android app windows or adding their icons.
+- ❌ User's first real-device test: the WSA PacMan icon appeared, but no per-app Android icons appeared.
+- ✅ Changed WSA process detection to match `WsaClient.exe` by executable name even when the expected package path differs or is unresolved.
+- ✅ Added diagnostic logging for visible windows, process paths, hook installation errors, close-event interception, and tray-icon registration.
+- ✅ Diagnostic build and installer passed CI workflow [#141](https://github.com/eboxont-code/wsa_pacman_x/actions/runs/41826799475); portable archive inspected and contains the hook DLL.
+- ⏳ Next: user installs the diagnostic build, reproduces one app close, and shares `%TEMP%\WsaPacMan-AppTray-Diagnostics.log`.
+
+### Diagnostic build record
+- PR head: `3c44440b72516bf5741986c621a69d5feb01bb89`.
+- Installer SHA-256: `47f63ec128666462bcbe67483338eb0841d552911cc21f54bace13386d49f0e2`.
+- Artifact ID: `13319523119`.
