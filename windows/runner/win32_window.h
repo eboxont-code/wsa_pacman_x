@@ -44,6 +44,7 @@ class Win32Window {
                                   LPARAM const lparam) noexcept;
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
   static BOOL CALLBACK EnumerateWsaWindows(HWND window, LPARAM parameter);
+  void LogWindowDiagnostic(HWND window);
   static BOOL CALLBACK RestoreAppTrayWindowsBeforeExit(HWND window,
                                                         LPARAM parameter);
 
@@ -65,6 +66,7 @@ class Win32Window {
   std::wstring wsa_client_executable_path_;
   std::unordered_map<DWORD, WsaThreadHooks> wsa_thread_hooks_;
   std::unordered_set<DWORD> failed_wsa_hook_threads_;
+  std::unordered_set<HWND> diagnosed_windows_;
 
   std::wstring ResolveWsaClientExecutablePath();
   std::wstring GetProcessImagePath(DWORD process_id);
