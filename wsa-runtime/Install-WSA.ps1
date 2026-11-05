@@ -493,6 +493,541 @@ function Get-LatestSevenZipTool([string]$Destination) {
     Invoke-VerifiedDownload -Uri $asset.browser_download_url -Destination $Destination -Digest $asset.digest -Description "7-Zip $($release.tag_name) extractor"
 }
 
+function Get-WsaSettingsApplicationId([string]$InstallLocation) {
+    $manifestPath = Join-Path $InstallLocation 'AppxManifest.xml'
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        throw "The WSA manifest was not found at $manifestPath."
+    }
+
+    [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw
+    $settingsApplication = $manifest.SelectNodes("//*[local-name()='Application']") |
+        Where-Object { $_.GetAttribute('Executable') -match '(?i)WsaSettings\.exe
+    $runBatch = Get-ChildItem -LiteralPath $Folder -Filter 'Run.bat' -File -Recurse |
+        Select-Object -First 1
+    if ($null -eq $runBatch) {
+        throw "The extracted upstream package did not contain Run.bat. The files have been kept at $Folder for inspection."
+    }
+
+    $workingDirectory = $runBatch.DirectoryName
+    $upstreamScript = Join-Path $workingDirectory 'Install.ps1'
+    if (-not (Test-Path -LiteralPath $upstreamScript -PathType Leaf)) {
+        throw "The extracted package did not contain Install.ps1 beside Run.bat. The files have been kept at $Folder for inspection."
+    }
+
+    Write-Host ''
+    Write-Info 'Registering the WSA Android runtime in the background.'
+    Write-Info 'Running the upstream Install.ps1 directly; its Run.bat launcher opens a separate visible PowerShell window.'
+
+    $sourceText = Get-Content -LiteralPath $upstreamScript -Raw
+    if ($sourceText -notmatch '(?i)Add-AppxPackage\s+-ForceApplicationShutdown\s+-ForceUpdateFromAnyVersion\s+-Register\s+\.\\AppxManifest\.xml') {
+        throw "The upstream Install.ps1 has an unexpected structure. Refusing to patch or run an unrecognized installer. The original file was left untouched."
+    }
+
+    # Create a temporary sibling copy so all upstream relative paths remain valid.
+    # Keep the verified upstream Install.ps1 unchanged.
+    $unattendedScript = Join-Path $workingDirectory 'Install-WSA-PacMan-Unattended.ps1'
+    $logDirectory = Join-Path $env:ProgramData 'WSABuilds\Logs'
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    $logStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $stdoutLog = Join-Path $logDirectory ("WSA-Upstream-$logStamp.stdout.log")
+    $stderrLog = Join-Path $logDirectory ("WSA-Upstream-$logStamp.stderr.log")
+
+    # Upstream Finish() launches Magisk and Play Store after registering WSA.
+    # This helper selects a NoGApps package, so don't launch unrelated Android apps.
+    $finishPattern = '(?ims)^Function\s+Finish\s*\{.*?^\}'
+    if (-not [regex]::IsMatch($sourceText, $finishPattern)) {
+        throw 'The upstream installer has an unrecognized Finish() function. Refusing to launch unrelated Android apps automatically.'
+    }
+    $finishReplacement = 'Function Finish {' + [Environment]::NewLine +
+        "    Write-Output 'WSA runtime registration completed.'" + [Environment]::NewLine + '}'
+    $finishEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $finishReplacement
+    }
+    $sourceText = [regex]::Replace($sourceText, $finishPattern, $finishEvaluator)
+
+    # Upstream prompts for keypresses on completion and error branches. Remove
+    # the waits. An existing-install confirmation gets a null key, i.e. "No".
+    $readKeyPattern = '(?m)(\$[A-Za-z_][A-Za-z0-9_]*\s*=\s*)\$Host\.UI\.RawUI\.ReadKey\(''NoEcho,IncludeKeyDown''\);?'
+    $readKeyMatches = [regex]::Matches($sourceText, $readKeyPattern)
+    if ($readKeyMatches.Count -eq 0) {
+        throw 'The upstream installer no longer contains the expected keypress prompt pattern. Refusing to run an unverified unattended variant.'
+    }
+    $readKeyEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $match.Groups[1].Value + '$null'
+    }
+    $sourceText = [regex]::Replace($sourceText, $readKeyPattern, $readKeyEvaluator)
+    if ($sourceText -match '(?i)RawUI\.ReadKey\s*\(') {
+        throw 'The upstream installer contains an unrecognized interactive keypress prompt. Refusing to run it hidden because that could leave setup waiting indefinitely.'
+    }
+
+    # Never let the upstream error-recovery path uninstall an existing package.
+    $preservePattern = '(?ims)^ElseIf\s*\(\s*\$null\s*-Ne\s*\$Installed\s*\)\s*\{.*?^\}'
+    if (-not [regex]::IsMatch($sourceText, $preservePattern)) {
+        throw 'The upstream installer no longer has the expected existing-package recovery path. Refusing an unattended install until that path can be reviewed.'
+    }
+    $preserveReplacement = 'ElseIf ($null -Ne $Installed) {' + [Environment]::NewLine +
+        "    throw 'WSA registration failed while an existing package is present. PacMan will not uninstall or replace it.'" + [Environment]::NewLine + '}'
+    $preserveEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $preserveReplacement
+    }
+    $sourceText = [regex]::Replace($sourceText, $preservePattern, $preserveEvaluator)
+
+    # The outer PacMan helper is already elevated. Keep even an unexpected
+    # upstream self-elevation or conhost fallback hidden.
+    $sourceText = $sourceText.Replace(
+        'Start-Process -PassThru -Verb RunAs $pwsh -Args',
+        'Start-Process -PassThru -Verb RunAs -WindowStyle Hidden $pwsh -Args'
+    )
+    $sourceText = $sourceText.Replace(
+        'Start-Process conhost.exe -Args',
+        'Start-Process conhost.exe -WindowStyle Hidden -Args'
+    )
+
+    [System.IO.File]::WriteAllText(
+        $unattendedScript,
+        $sourceText,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+
+    try {
+        $powershell = Join-Path $PSHOME 'powershell.exe'
+        if (-not (Test-Path -LiteralPath $powershell -PathType Leaf)) {
+            throw "Windows PowerShell could not be found at $powershell."
+        }
+
+        $arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $unattendedScript + '"'
+        $process = Start-Process -FilePath $powershell -ArgumentList $arguments -WorkingDirectory $workingDirectory -WindowStyle Hidden -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -Wait -PassThru
+
+        if ($process.ExitCode -ne 0) {
+            $stderrTail = if (Test-Path -LiteralPath $stderrLog) {
+                (Get-Content -LiteralPath $stderrLog -Tail 20 -ErrorAction SilentlyContinue) -join ' '
+            } else { '' }
+            throw "The hidden upstream WSA registration process exited with code $($process.ExitCode). Details: $stderrTail. Logs: $stdoutLog and $stderrLog"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $unattendedScript -Force -ErrorAction SilentlyContinue
+    }
+
+    Start-Sleep -Seconds 3
+    $registered = Get-ExistingWsaPackage
+    if ($registered.Count -eq 0) {
+        throw "The upstream installer finished, but Windows did not report a registered WSA package. Logs: $stdoutLog and $stderrLog. The original files were kept at $workingDirectory."
+    }
+
+    Write-Info "Upstream installer output: $stdoutLog"
+    Write-Info "Upstream installer errors: $stderrLog"
+    return $registered
+}
+
+try {
+    Ensure-Administrator
+
+    $logDirectory = Join-Path $env:ProgramData 'WSABuilds\Logs'
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    $logPath = Join-Path $logDirectory ("Install-WSA-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    try {
+        Start-Transcript -Path $logPath -Force | Out-Null
+        $script:TranscriptStarted = $true
+    }
+    catch {
+        Write-WarningMessage "A diagnostic log could not be started: $($_.Exception.Message)"
+    }
+
+    if ($ResumeAfterRestart) {
+        Remove-WsaResumeTask
+        Write-Info 'Windows sign-in detected after the prerequisite restart; automatically resuming setup.'
+    }
+
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+    Write-Host ''
+    Write-Info 'Architecture-aware Android runtime setup'
+    Write-Host 'This downloads the current upstream WSABuilds LTS archive directly from GitHub.'
+    Write-Host 'Default package: Android 13, no Google Play Services, no Amazon Appstore.'
+    Write-Host ''
+
+    $target = Get-WindowsTarget
+    Write-Info "Detected Windows target: $($target.OsFamily), native CPU: $($target.Architecture)"
+
+    $existingPackages = Get-ExistingWsaPackage
+    if ($existingPackages.Count -gt 0) {
+        $package = $existingPackages | Select-Object -First 1
+        $installedArchitecture = [string]$package.Architecture
+        Write-Host ''
+        Write-Info "An existing WSA package is already registered: $($package.Name) ($installedArchitecture)."
+        if (($target.Architecture -eq 'arm64' -and $installedArchitecture -match 'Arm64') -or
+            ($target.Architecture -eq 'x64' -and $installedArchitecture -match 'X64')) {
+            Write-Info 'It appears to match this PC. No WSA files or user data were changed.'
+            Write-Host 'Open Windows Subsystem for Android Settings, enable Developer mode, then open WSA PacMan.'
+        }
+        else {
+            Write-WarningMessage 'The registered WSA architecture does not match this PC. No uninstall or replacement was attempted.'
+            Write-Host 'Back up Userdata.vhdx before any manual architecture change:'
+            Write-Host "$env:LOCALAPPDATA\Packages\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe\LocalCache\userdata.vhdx"
+        }
+        exit 0
+    }
+
+    $previousUserData = Join-Path $env:LOCALAPPDATA 'Packages\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe\LocalCache\userdata.vhdx'
+    if (Test-Path -LiteralPath $previousUserData) {
+        Write-WarningMessage 'A previous WSA Userdata.vhdx was found even though no WSA package is currently registered.'
+        Write-Host "Possible Android app data is stored here: $previousUserData"
+        Write-Host 'Copy this file to a safe backup location and move the original out of the WSA package folder before running a fresh install.'
+        Write-Info 'No download, extraction, installation or deletion was performed.'
+        exit 0
+    }
+
+    Confirm-WsaPrerequisites -Target $target
+
+    $computer = Get-CimInstance -ClassName Win32_ComputerSystem
+    $memoryGb = [math]::Round($computer.TotalPhysicalMemory / 1GB, 1)
+    $systemDrive = [IO.Path]::GetPathRoot($env:SystemRoot)
+    $driveInfo = New-Object System.IO.DriveInfo($systemDrive)
+
+    $assetInfo = Get-LatestMatchingWsaAsset -Target $target
+    $release = $assetInfo.Release
+    $asset = $assetInfo.Asset
+    $archiveSizeGb = [math]::Round($asset.size / 1GB, 2)
+
+    Write-Host ''
+    Write-Info "Selected release: $($release.name)"
+    Write-Info "Selected package: $($asset.name)"
+    Write-Info "Compressed download: approximately $archiveSizeGb GB"
+    Write-Info "Free space on $systemDrive $([math]::Round($driveInfo.AvailableFreeSpace / 1GB, 1)) GB"
+    Write-Host ''
+    Write-WarningMessage 'Microsoft ended official WSA support on 5 March 2025. This is an unofficial community build.'
+    Write-WarningMessage 'The selected NoGApps package does not include Google Play Store or Google Play Services.'
+    Write-Host 'The extracted WSA folder must remain on this PC after installation.'
+    Write-Host ''
+
+    Write-Info 'The WSA runtime installation task was selected. Continuing automatically with download, verification, extraction and registration.'
+
+    $root = Join-Path $env:ProgramData 'WSABuilds'
+    $installFolder = Join-Path $root ("WSA-" + $release.tag_name)
+    $downloadsFolder = Join-Path $root 'Downloads'
+    $toolsFolder = Join-Path $root 'Tools'
+    New-Item -ItemType Directory -Path $root, $downloadsFolder, $toolsFolder -Force | Out-Null
+
+    $runBatchAlreadyExtracted = Get-ChildItem -LiteralPath $installFolder -Filter 'Run.bat' -File -Recurse -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($null -eq $runBatchAlreadyExtracted) {
+        if (Test-Path -LiteralPath $installFolder) {
+            $preservedFolder = "$installFolder.incomplete.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+            Move-Item -LiteralPath $installFolder -Destination $preservedFolder -ErrorAction Stop
+            Write-WarningMessage "A previous incomplete extraction was preserved at $preservedFolder."
+        }
+        New-Item -ItemType Directory -Path $installFolder -Force | Out-Null
+    }
+    else {
+        Write-Info 'Found a previously extracted copy of this exact LTS release. It will be reused.'
+    }
+
+    if ($null -eq $runBatchAlreadyExtracted) {
+        $sevenZipPath = Join-Path $toolsFolder '7zr.exe'
+        Get-LatestSevenZipTool -Destination $sevenZipPath
+
+        $archivePath = Join-Path $downloadsFolder $asset.name
+        Invoke-VerifiedDownload -Uri $asset.browser_download_url -Destination $archivePath -Digest $asset.digest -Description $asset.name
+
+        Write-Info 'Extracting the verified WSA archive. This can take several minutes.'
+        & $sevenZipPath x $archivePath "-o$installFolder" -y
+        if ($LASTEXITCODE -ne 0) {
+            throw "7-Zip extraction failed with exit code $LASTEXITCODE. The download and partial files were left for inspection."
+        }
+    }
+
+    $installedPackages = Install-WsaFromFolder -Folder $installFolder
+    $registeredPackage = $installedPackages | Select-Object -First 1
+    $developerModeEnabled = Enable-WsaDeveloperMode -Package $registeredPackage
+    if (-not $developerModeEnabled) {
+        Write-WarningMessage 'WSA installation completed, but Android Developer mode needs manual confirmation in WSA Settings.'
+    }
+    Write-Host ''
+    Write-Info "WSA is registered: $($registeredPackage.Name)"
+    Write-Info "The WSA files are stored at: $installFolder"
+    Write-Info 'The WSA files must remain on this PC. Windows uses them to run WSA.'
+    Write-Host 'Next: WSA is installed. Open WSA PacMan to connect to the Android runtime.'
+
+    if ($archivePath -and (Test-Path -LiteralPath $archivePath)) {
+        Remove-Item -LiteralPath $archivePath -Force
+    }
+    Remove-WsaResumeTask
+    if ($script:TranscriptStarted) {
+        Stop-Transcript | Out-Null
+        $script:TranscriptStarted = $false
+    }
+}
+catch {
+    Write-Host ''
+    Write-WarningMessage $_.Exception.Message
+    Write-Host 'No existing WSA installation was automatically uninstalled or overwritten.'
+    if ($script:TranscriptStarted) {
+        Stop-Transcript | Out-Null
+        Write-Host "Diagnostic log: $logPath"
+        $script:TranscriptStarted = $false
+    }
+    exit 1
+}
+ } |
+        Select-Object -First 1
+
+    if ($null -eq $settingsApplication) {
+        throw 'The WSA manifest does not declare an application for WsaSettings.exe.'
+    }
+
+    $applicationId = $settingsApplication.GetAttribute('Id')
+    if ([string]::IsNullOrWhiteSpace($applicationId)) {
+        throw 'The WSA Settings application has no registered Application Id.'
+    }
+
+    return $applicationId
+}
+
+function Enable-WsaDeveloperMode($Package) {
+    # WSA Android Developer mode is stored in this user's settings.dat registry
+    # hive. Do not change Windows OS Developer Mode (AppModelUnlock), and do
+    # not replace the complete hive with a pre-patched file.
+    $settingsPath = $null
+    $hiveLoaded = $false
+    $hiveName = 'WSAPacmanDeveloperMode_' + [guid]::NewGuid().ToString('N')
+    $hiveSubKey = $hiveName
+    $hiveMount = "HKLM\$hiveName"
+    $regExe = Join-Path $env:SystemRoot 'System32\reg.exe'
+
+    try {
+        if ([string]::IsNullOrWhiteSpace([string]$Package.PackageFamilyName)) {
+            throw 'The registered WSA package did not report a PackageFamilyName.'
+        }
+
+        $settingsDirectory = Join-Path (Join-Path $env:LOCALAPPDATA 'Packages') (Join-Path $Package.PackageFamilyName 'Settings')
+        $settingsPath = Join-Path $settingsDirectory 'settings.dat'
+
+        if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+            # First launch creates WSA's per-user settings hive. Launch the
+            # package's registered Settings app rather than assuming an ID.
+            $settingsApplicationId = Get-WsaSettingsApplicationId -InstallLocation $Package.InstallLocation
+            $aumid = "$($Package.PackageFamilyName)!$settingsApplicationId"
+            Write-Info 'Initializing the new WSA user settings hive.'
+            Start-Process -FilePath (Join-Path $env:SystemRoot 'explorer.exe') -ArgumentList "shell:AppsFolder\$aumid" -WindowStyle Hidden | Out-Null
+
+            $deadline = (Get-Date).AddSeconds(60)
+            while ((Get-Date) -lt $deadline -and -not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+                Start-Sleep -Seconds 1
+            }
+        }
+
+        if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+            throw "WSA did not create its settings.dat file at $settingsPath within 60 seconds."
+        }
+
+        # The hive can remain open while the Settings app is running. Only close
+        # a WsaSettings.exe instance launched by this setup invocation; never
+        # terminate a pre-existing Settings process.
+        $settingsExecutable = Join-Path $Package.InstallLocation 'WsaSettings.exe'
+        if (Test-Path -LiteralPath $settingsExecutable -PathType Leaf) {
+            $settingsProcesses = @(
+                Get-CimInstance Win32_Process -Filter "Name='WsaSettings.exe'" -ErrorAction SilentlyContinue |
+                    Where-Object { $_.ExecutablePath -and $_.ExecutablePath -ieq $settingsExecutable }
+            )
+            foreach ($settingsProcess in $settingsProcesses) {
+                try {
+                    $process = Get-Process -Id ([int]$settingsProcess.ProcessId) -ErrorAction Stop
+                    if ($process.MainWindowHandle -ne 0) {
+                        [void]$process.CloseMainWindow()
+                        [void]$process.WaitForExit(5000)
+                    }
+                }
+                catch {
+                    # If it is still running, reg.exe load below fails safely;
+                    # do not force-close an app that may belong to the user.
+                }
+            }
+        }
+
+        $backupPath = $settingsPath + '.pre-dev-mode.' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.bak'
+        Copy-Item -LiteralPath $settingsPath -Destination $backupPath -ErrorAction Stop
+        Write-Info "Backed up the original WSA settings hive to $backupPath."
+
+        if (-not (Test-Path -LiteralPath $regExe -PathType Leaf)) {
+            throw "Windows Registry tool was not found at $regExe."
+        }
+
+        & $regExe load $hiveMount $settingsPath | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not mount the WSA settings hive (reg.exe exit code $LASTEXITCODE). The original settings file was not changed."
+        }
+        $hiveLoaded = $true
+
+        if (-not ('WsaPacmanRawRegistryValue' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public sealed class WsaPacmanRegistryReadResult
+{
+    public int Status { get; private set; }
+    public uint Type { get; private set; }
+    public byte[] Data { get; private set; }
+
+    public WsaPacmanRegistryReadResult(int status, uint type, byte[] data)
+    {
+        Status = status;
+        Type = type;
+        Data = data ?? new byte[0];
+    }
+}
+
+public static class WsaPacmanRawRegistryValue
+{
+    private const int ERROR_SUCCESS = 0;
+    private const int KEY_QUERY_VALUE = 0x0001;
+    private const int KEY_SET_VALUE = 0x0002;
+    private const int ERROR_INVALID_DATA = 13;
+    private static readonly IntPtr HKEY_LOCAL_MACHINE =
+        new IntPtr(unchecked((int)0x80000002));
+
+    [DllImport("advapi32.dll", EntryPoint = "RegOpenKeyExW", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern int RegOpenKeyEx(
+        IntPtr hKey, string subKey, uint options, int desiredAccess, out IntPtr result);
+
+    [DllImport("advapi32.dll", EntryPoint = "RegQueryValueExW", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern int RegQueryValueSize(
+        IntPtr key, string valueName, IntPtr reserved, out uint type, IntPtr data, ref uint dataSize);
+
+    [DllImport("advapi32.dll", EntryPoint = "RegQueryValueExW", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern int RegQueryValueData(
+        IntPtr key, string valueName, IntPtr reserved, out uint type, [Out] byte[] data, ref uint dataSize);
+
+    [DllImport("advapi32.dll", EntryPoint = "RegSetValueExW", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern int RegSetValue(
+        IntPtr key, string valueName, uint reserved, uint type, byte[] data, uint dataSize);
+
+    [DllImport("advapi32.dll", EntryPoint = "RegCloseKey", ExactSpelling = true)]
+    private static extern int RegCloseKey(IntPtr key);
+
+    public static WsaPacmanRegistryReadResult Read(string subKey, string valueName)
+    {
+        IntPtr key = IntPtr.Zero;
+        int status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, subKey, 0, KEY_QUERY_VALUE, out key);
+        if (status != ERROR_SUCCESS)
+            return new WsaPacmanRegistryReadResult(status, 0, null);
+
+        try
+        {
+            uint type = 0;
+            uint size = 0;
+            status = RegQueryValueSize(key, valueName, IntPtr.Zero, out type, IntPtr.Zero, ref size);
+            if (status != ERROR_SUCCESS)
+                return new WsaPacmanRegistryReadResult(status, type, null);
+            if (size > 65536)
+                return new WsaPacmanRegistryReadResult(ERROR_INVALID_DATA, type, null);
+
+            byte[] data = new byte[size];
+            if (size > 0)
+            {
+                status = RegQueryValueData(key, valueName, IntPtr.Zero, out type, data, ref size);
+                if (status != ERROR_SUCCESS)
+                    return new WsaPacmanRegistryReadResult(status, type, null);
+                if (size < data.Length)
+                    Array.Resize(ref data, (int)size);
+            }
+
+            return new WsaPacmanRegistryReadResult(ERROR_SUCCESS, type, data);
+        }
+        finally
+        {
+            RegCloseKey(key);
+        }
+    }
+
+    public static int Write(string subKey, string valueName, uint type, byte[] data)
+    {
+        IntPtr key = IntPtr.Zero;
+        int status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, subKey, 0, KEY_SET_VALUE, out key);
+        if (status != ERROR_SUCCESS)
+            return status;
+
+        try
+        {
+            return RegSetValue(key, valueName, 0, type, data, (uint)data.Length);
+        }
+        finally
+        {
+            RegCloseKey(key);
+        }
+    }
+}
+'@ -ErrorAction Stop
+        }
+
+        # WSA stores DeveloperModeEnabled as a 9-byte custom registry value.
+        # Preserve its 8-byte metadata when the value already exists.
+        $developerModeValueType = [uint32]0x05F5E10B
+        $read = [WsaPacmanRawRegistryValue]::Read($hiveSubKey, 'DeveloperModeEnabled')
+
+        if ($read.Status -eq 2) {
+            # Fresh WSA settings hive: first byte is the enabled flag; the
+            # remaining bytes are its FILETIME metadata.
+            $payload = New-Object byte[] 9
+            $payload[0] = 1
+            [byte[]]$fileTime = [BitConverter]::GetBytes([DateTime]::UtcNow.ToFileTimeUtc())
+            [Array]::Copy($fileTime, 0, $payload, 1, 8)
+            $writeType = $developerModeValueType
+            Write-Info 'Creating the WSA DeveloperModeEnabled setting in the fresh settings hive.'
+        }
+        elseif ($read.Status -ne 0) {
+            throw "Could not read WSA DeveloperModeEnabled (Windows registry error $($read.Status))."
+        }
+        else {
+            if ($read.Type -ne $developerModeValueType -or $read.Data.Length -ne 9) {
+                throw "WSA DeveloperModeEnabled has an unrecognized registry type/length ($($read.Type)/$($read.Data.Length)); refusing to alter the settings hive."
+            }
+            if ($read.Data[0] -notin @(0, 1)) {
+                throw "WSA DeveloperModeEnabled has an unexpected flag byte ($($read.Data[0])); refusing to alter the settings hive."
+            }
+            if ($read.Data[0] -eq 1) {
+                Write-Info 'WSA Android Developer mode is already enabled.'
+                return $true
+            }
+
+            $payload = [byte[]]$read.Data.Clone()
+            $payload[0] = 1
+            $writeType = $read.Type
+            Write-Info 'Enabling WSA Android Developer mode while preserving the existing hive metadata.'
+        }
+
+        $writeStatus = [WsaPacmanRawRegistryValue]::Write($hiveSubKey, 'DeveloperModeEnabled', $writeType, $payload)
+        if ($writeStatus -ne 0) {
+            throw "Could not write WSA DeveloperModeEnabled (Windows registry error $writeStatus)."
+        }
+
+        $verify = [WsaPacmanRawRegistryValue]::Read($hiveSubKey, 'DeveloperModeEnabled')
+        if ($verify.Status -ne 0 -or $verify.Type -ne $writeType -or $verify.Data.Length -ne 9 -or $verify.Data[0] -ne 1) {
+            throw 'WSA DeveloperModeEnabled read-back verification failed.'
+        }
+
+        Write-Info 'WSA Android Developer mode was enabled and verified in settings.dat.'
+        return $true
+    }
+    catch {
+        Write-WarningMessage "Could not enable WSA Android Developer mode automatically: $($_.Exception.Message)"
+        Write-Host 'WSA remains installed. Open WSA Settings > Advanced settings and turn Developer mode on manually if needed.'
+        return $false
+    }
+    finally {
+        if ($hiveLoaded) {
+            & $regExe unload $hiveMount | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-WarningMessage 'The temporary WSA settings hive could not be unloaded cleanly. Restart Windows before manually editing WSA settings.'
+            }
+        }
+    }
+}
+
 function Install-WsaFromFolder([string]$Folder) {
     $runBatch = Get-ChildItem -LiteralPath $Folder -Filter 'Run.bat' -File -Recurse |
         Select-Object -First 1
