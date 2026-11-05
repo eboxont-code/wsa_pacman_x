@@ -41,6 +41,9 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Test ADB connection result classification
+        run: flutter test test/adb_connection_test.dart
+
       - name: Validate WSA runtime checks and installer defaults
         shell: pwsh
         run: |
