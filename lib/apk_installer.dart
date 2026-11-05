@@ -14,6 +14,7 @@ import 'package:wsa_pacman/widget/themed_pane_item.dart';
 import 'package:wsa_pacman/windows/win_io.dart';
 import 'package:wsa_pacman/widget/adaptive_icon.dart';
 import 'package:wsa_pacman/widget/flexible_info_bar.dart';
+import 'package:wsa_pacman/widget/fluent_info_bar.dart';
 import 'package:wsa_pacman/widget/move_window_nomax.dart';
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/material.dart' as material;
