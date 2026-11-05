@@ -31,7 +31,7 @@
 
 ## Current task
 
-- ⏳ **Live WSA verification of each Android app's X-to-tray behavior** — second queued-close interception build passed Windows CI and a verified EXE installer is ready. Need a live WSA test to confirm queued `WM_CLOSE`/`SC_CLOSE` interception, hook execution inside WsaClient, per-app NIM_ADD, one-app-only hide/restore, and background activity.
+- 🔄 **Remove the X button from every WSA Android app window** — live per-app tray interception did not work on the user's WSA desktop. Current change removes `WS_SYSMENU` from each WSA app window at activation and immediately after hook installation. This removes X completely but also removes the standard Minimize/Maximize buttons and system menu. Need Windows CI + EXE installer, then live confirmation that Android app windows no longer show X and PacMan is unchanged.
 
 ## Project goal
 
@@ -932,3 +932,11 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Extracted Windows installer `WSA-pacman-universal-v1.5.0-installer.exe`, size `37,105,173` bytes; SHA-256 `15926d9283f98aedeea54d477571fa7138fa05a86462bba366e2a5869eab0988`.
 - ✅ Verified portable package includes `WsaPacManAppTrayHook.dll`; verified Inno Setup includes all files under the release directory.
 - ⚠️ Windows CI/build success does not prove live hook injection or per-app tray behaviour. Need user runtime test and `%TEMP%\\WsaPacMan-AppTray-Diagnostics.log` if icons still fail.
+
+### 2026-11-05 — Per-app X button removal fallback
+- ✅ User reports the second per-app tray hook installer still does not create an app tray icon; user asked whether the X button can be removed completely instead.
+- ✅ Confirmed the Win32 title-bar limitation: the standard supported way to remove the Close button entirely is to remove `WS_SYSMENU`; the standard Minimize/Maximize buttons are also lost. Disabling only `SC_CLOSE` retains the X but leaves it disabled. Source: Raymond Chen, 2026-09-11, https://devblogs.microsoft.com/oldnewthing/20260911-00/?p=112691/.
+- ✅ Added `RemoveAppCloseControl` to the injected per-app hook DLL. It verifies the target HWND belongs to the current WsaClient process, removes only `WS_SYSMENU` from that WSA app window, and refreshes its non-client frame with `SWP_FRAMECHANGED`.
+- ✅ Apply removal on `HCBT_ACTIVATE`, on the next queued message, and immediately after hooks are installed by posting `WM_NULL` to the target WSA UI thread. PacMan's own window is not changed.
+- ✅ Added CI source guards for `WS_SYSMENU` removal, frame refresh, CBT activation handling, and initial target-thread kick.
+- ⏳ Need a Windows build/EXE installer and a real WSA desktop smoke test. Verify the X disappears from Android windows, note that Minimize/Maximize and system menu also disappear, and confirm PacMan's own window remains unchanged.
