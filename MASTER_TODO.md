@@ -206,4 +206,10 @@ Every Android app window running under WSA must behave independently in the Wind
 
 ### 2026-11-05 — WSA PacMan executable located
 - ✅ User's process inventory confirms `WSA-pacman.exe` PID `28796`, executable path `C:\\Program Files\\WSA PacMan\\WSA-pacman.exe`.
-- ⏳ Next: run bundled ADB directly from the manager installation directory and inspect whether WSA exposes an Android device.
+- ✅ Bundled ADB at `C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe` now lists `127.0.0.1:58526 device`; WSA is reachable over ADB.
+- ⏳ Next: query Android boot completion and whether package `io.getgrass.www` is installed; if installed, capture launch result/logcat.
+
+
+### 2026-11-05 — Android device reachable over ADB
+- ✅ User ran bundled ADB from `C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe`; `adb devices` returned `127.0.0.1:58526 device`.
+- ⏳ Next: verify Android boot completion and inspect Android package `io.getgrass.www`; then diagnose launch failure from Android-side evidence. Do not modify the separate Windows Grass app.
