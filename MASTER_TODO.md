@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Fix and validate the WSA DeveloperModeEnabled registry subkey** — source review found the helper currently targets the settings.dat hive root, but the WSA-specific reference writes the value under `LocalState`. Correct the helper and add a CI guard that requires the correct subkey. Preserve the fresh-install-only gate and do not modify the user's existing WSA installation.
+- 🔄 **Validate the LocalState registry-key correction in CI** — `wsa-runtime/Install-WSA.ps1` now targets `$hiveName\LocalState`, and Windows workflow static checks require the exact assignment. Confirm the new CI run passes before calling the code change validated. Fresh-install runtime test remains separate and outstanding.
 
 ## Project goal
 
@@ -829,3 +829,11 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Independent settings.dat structural research describes the hive tree as a root key with a `LocalState` subkey and identifies `0x05F5E10B` as Boolean with one value byte plus 8-byte FILETIME metadata: https://urock-ailab.github.io/forensics-handbook/windows/01-foundations/app-mail-data/packages-settings-dat.html
 - ⚠️ The current helper's root-key target therefore appears incorrect; CI run #187 did not catch it because its checks require the value name/type and C# compilation but do not assert the `LocalState` target.
 - 🔄 Current work: change the helper subkey to `$hiveName\LocalState`, require that target explicitly in Windows CI, then rerun the build workflow. Existing WSA installations remain outside the installer helper's existing-package early-exit path and will not be modified.
+
+
+### 2026-11-05 — Correct DeveloperModeEnabled target key and add regression guard
+- ✅ Updated `wsa-runtime/Install-WSA.ps1`: `$hiveSubKey = "$hiveName\LocalState"` instead of targeting the mounted hive root.
+- ✅ All existing backup, schema validation, single-byte update, metadata preservation, read-back verification, and fresh-install-only safeguards remain unchanged.
+- ✅ Updated `.github/workflows/build-windows.yml` to require the exact `$hiveSubKey = "$hiveName\LocalState"` source assignment in the runtime checks. This closes the gap that let the earlier root-key implementation pass static validation.
+- ✅ Source evidence: the WSA-specific reference adds `DeveloperModeEnabled` beneath `HKLM\WSA\LocalState`; the settings.dat structure reference confirms `LocalState` is a subkey in the package settings hive and explains custom Boolean type `0x05F5E10B` uses 1 byte of value plus 8 bytes of timestamp metadata.
+- ⏳ Awaiting Windows CI for the corrected commit. A fresh WSA runtime installation is still required to prove the setting is reflected in the WSA UI; do not modify the user's existing WSA installation.
