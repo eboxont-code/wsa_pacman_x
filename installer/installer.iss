@@ -96,8 +96,8 @@ Name: "{group}\Uninstall WSA PacMan"; Filename: "{uninstallexe}"; IconFilename: 
 ; Remove every remaining file/folder inside the PacMan install directory.
 Type: filesandordirs; Name: "{app}\*"
 ; Remove this user's PacMan settings and the legacy settings folder. Keep WSA itself under ProgramData\WSABuilds.
-Type: filesandordirs; Name: "{userprofile}\.wsa-pacman"
-Type: filesandordirs; Name: "{userprofile}\.wsamanager"
+Type: filesandordirs; Name: "{%USERPROFILE}\.wsa-pacman"
+Type: filesandordirs; Name: "{%USERPROFILE}\.wsamanager"
 
 [Code]
 
