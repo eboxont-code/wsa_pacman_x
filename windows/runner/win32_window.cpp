@@ -411,6 +411,16 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
 
   wsa_hook_retry_after_.erase(thread_id);
   wsa_thread_hooks_.emplace(thread_id, hooks);
+
+  // Kick the target UI thread once so WH_GETMESSAGE can remove the X from
+  // an already-open, already-active Android app window immediately.
+  if (!PostThreadMessageW(thread_id, WM_NULL, 0, 0)) {
+    const DWORD error = GetLastError();
+    std::wstringstream diagnostic;
+    diagnostic << L"Could not post initial app-window style refresh to TID="
+               << thread_id << L"; Win32 error=" << error;
+    AppendTrayDiagnostic(diagnostic.str());
+  }
 }
 
 void Win32Window::InstallWsaAppHooks() {
