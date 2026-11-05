@@ -163,26 +163,26 @@ class WSAPeriodicConnector {
     final prevStatus = status;
     final process = await ADBUtils.devices();
     final output = process.stdout.toString();
-    if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):\${GState.androidPort.\$}\\s+'))) {
-      if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):\${GState.androidPort.\$}\\s+offline(\\$|\\n|\\s)'))) {
+    if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+'))) {
+      if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+offline(\\$|\\n|\\s)'))) {
         GState.adbConnectionDiagnostic.update((_) =>
-            'ADB reports \${ADBUtils.deviceName} as offline.');
+            'ADB reports ${ADBUtils.deviceName} as offline.');
         status = (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.STARTING) && shouldWaitStart
             ? ConnectionStatus.STARTING
             : ConnectionStatus.OFFLINE;
-      } else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):\${GState.androidPort.\$}\\s+host(\\$|\\n|\\s)'))) {
+      } else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+host(\\$|\\n|\\s)'))) {
         reconnect();
-      } else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):\${GState.androidPort.\$}\\s+unauthorized(\\$|\\n|\\s)'))) {
+      } else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+unauthorized(\\$|\\n|\\s)'))) {
         GState.adbConnectionDiagnostic.update((_) =>
-            'ADB reports \${ADBUtils.deviceName} as unauthorized. The Android authorization prompt may need approval.');
+            'ADB reports ${ADBUtils.deviceName} as unauthorized. The Android authorization prompt may need approval.');
         status = ConnectionStatus.UNAUTHORIZED;
         if (prevStatus == ConnectionStatus.UNKNOWN) reconnect();
       } else {
         GState.adbConnectionDiagnostic.update((_) => "");
         status = ConnectionStatus.CONNECTED;
-        if (output.contains(RegExp('(^|\\n)127.0.0.1:\${GState.androidPort.\$}\\s+'))) {
-          if (GState.ipAddress.\$ != "127.0.0.1") GState.ipAddress.update((old) => "127.0.0.1");
-        } else if (GState.ipAddress.\$ != "localhost") {
+        if (output.contains(RegExp('(^|\\n)127.0.0.1:${GState.androidPort.$}\\s+'))) {
+          if (GState.ipAddress.$ != "127.0.0.1") GState.ipAddress.update((old) => "127.0.0.1");
+        } else if (GState.ipAddress.$ != "localhost") {
           GState.ipAddress.update((old) => "localhost");
         }
       }
