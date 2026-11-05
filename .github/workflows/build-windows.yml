@@ -328,7 +328,13 @@ jobs:
             "WH_GETMESSAGE received queued SC_CLOSE",
             "Queued Android app close intercepted",
             "close message replaced with WM_NULL",
-            "Shell_NotifyIconW(NIM_ADD) failed for HWND="
+            "Shell_NotifyIconW(NIM_ADD) failed for HWND=",
+            "RemoveAppCloseControl",
+            "WS_SYSMENU",
+            "HCBT_ACTIVATE",
+            "SWP_FRAMECHANGED",
+            "Removed WS_SYSMENU from WSA Android app window",
+            "PostThreadMessageW(thread_id, WM_NULL"
           )
           foreach ($check in $hookChecks) {
             if ($trayHookSource -notmatch [regex]::Escape($check)) {
