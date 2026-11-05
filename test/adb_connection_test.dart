@@ -58,6 +58,42 @@ void main() {
       );
     });
 
+    test('reports the failed endpoint and stderr reason', () {
+      expect(
+        describeAdbConnectFailure(
+          endpoint: '127.0.0.1:58526',
+          exitCode: 1,
+          stdout: '',
+          stderr: 'cannot connect: connection refused',
+        ),
+        'ADB could not connect to 127.0.0.1:58526: cannot connect: connection refused',
+      );
+    });
+
+    test('reports a timeout without an empty generic error', () {
+      expect(
+        describeAdbConnectFailure(
+          endpoint: 'localhost:58526',
+          exitCode: -1,
+          stdout: '',
+          stderr: '',
+          timedOut: true,
+        ),
+        'Connection to localhost:58526 timed out while starting ADB.',
+      );
+    });
+
+    test('caps long diagnostic output', () {
+      final diagnostic = describeAdbConnectFailure(
+        endpoint: 'localhost:58526',
+        exitCode: 1,
+        stdout: 'x' * 400,
+        stderr: '',
+      );
+      expect(diagnostic.length, lessThan(300));
+      expect(diagnostic, endsWith('...'));
+    });
+
     test('treats a timed-out process as a failure', () {
       expect(
         classifyAdbConnectOutcome(
