@@ -218,8 +218,12 @@ class WSAPeriodicConnector {
   }
 
   static Future<void> reconnect() async {
+    final previousStatus = status;
     await ADBUtils.disconnectWSA();
     await _tryConnect();
+    if (status != previousStatus) {
+      GState.connectionStatus.$ = status.statusAlert;
+    }
   }
 
   static Future<void> _tryConnect() async {
