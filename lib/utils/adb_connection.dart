@@ -60,3 +60,97 @@ String describeAdbConnectFailure({
       : details;
   return 'ADB could not connect to $endpoint: $conciseDetails';
 }
+
+
+/// ADB endpoint reported by adb devices -l for a WSA device.
+class WsaAdbEndpoint {
+  const WsaAdbEndpoint({
+    required this.host,
+    required this.port,
+    required this.state,
+  });
+
+  final String host;
+  final int port;
+  final String state;
+
+  String get serial => '$host:$port';
+}
+
+bool _isIpv4Address(String value) {
+  final parts = value.split('.');
+  if (parts.length != 4) return false;
+  for (final part in parts) {
+    final octet = int.tryParse(part);
+    if (octet == null || octet < 0 || octet > 255) return false;
+  }
+  return true;
+}
+
+/// Finds a unique WSA endpoint from adb devices -l.
+///
+/// WSA identifies itself with product/device windows_x86_64. A configured
+/// endpoint is retained when responding; a unique responding WSA alternate
+/// replaces a stale offline endpoint. Ambiguous instances are never guessed.
+WsaAdbEndpoint? findWsaAdbEndpoint(
+  String devicesOutput, {
+  String? preferredSerial,
+}) {
+  final candidates = <WsaAdbEndpoint>[];
+
+  for (final line in devicesOutput.split(RegExp(r'\r?\n'))) {
+    final match = RegExp(
+      r'^\s*(\d{1,3}(?:\.\d{1,3}){3}):(\d+)\s+(device|offline|unauthorized|host)(?:\s+(.*))?\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
+    if (match == null) continue;
+
+    final host = match.group(1)!;
+    final port = int.tryParse(match.group(2)!);
+    if (!_isIpv4Address(host) || port == null || port < 1 || port > 65535) {
+      continue;
+    }
+
+    final metadata = match.group(4) ?? '';
+    final isWsa = RegExp(
+      r'(^|\s)(product|device):windows_x86_64(\s|$)',
+      caseSensitive: false,
+    ).hasMatch(metadata) ||
+        RegExp(
+          r'(^|\s)model:Subsystem_for_Android',
+          caseSensitive: false,
+        ).hasMatch(metadata);
+    if (!isWsa) continue;
+
+    candidates.add(WsaAdbEndpoint(
+      host: host,
+      port: port,
+      state: match.group(3)!.toLowerCase(),
+    ));
+  }
+
+  if (candidates.isEmpty) return null;
+
+  WsaAdbEndpoint? preferred;
+  if (preferredSerial != null) {
+    for (final candidate in candidates) {
+      if (candidate.serial == preferredSerial) {
+        preferred = candidate;
+        break;
+      }
+    }
+  }
+
+  // Prefer a responding WSA endpoint over a stale configured endpoint that
+  // is still listed as offline.
+  final responding = candidates
+      .where((candidate) => candidate.state != 'offline' && candidate.state != 'host')
+      .toList();
+  if (preferred != null && preferred.state != 'offline' && preferred.state != 'host') {
+    return preferred;
+  }
+  if (responding.length == 1) return responding.single;
+  if (preferred != null) return preferred;
+
+  return candidates.length == 1 ? candidates.single : null;
+}

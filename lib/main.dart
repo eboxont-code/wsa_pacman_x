@@ -161,37 +161,57 @@ class WSAPeriodicConnector {
     }
 
     final prevStatus = status;
-    final process = await ADBUtils.devices();
-    final output = process.stdout.toString();
-    if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+'))) {
-      if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+offline(\$|\\n|\\s)'))) {
-        GState.adbConnectionDiagnostic.update((_) =>
-            'ADB reports ${ADBUtils.deviceName} as offline.');
-        status = (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.STARTING) && shouldWaitStart
-            ? ConnectionStatus.STARTING
-            : ConnectionStatus.OFFLINE;
-      } else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+host(\$|\\n|\\s)'))) {
-        reconnect();
-      } else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+unauthorized(\$|\\n|\\s)'))) {
-        GState.adbConnectionDiagnostic.update((_) =>
-            'ADB reports ${ADBUtils.deviceName} as unauthorized. The Android authorization prompt may need approval.');
-        status = ConnectionStatus.UNAUTHORIZED;
-        if (prevStatus == ConnectionStatus.UNKNOWN) reconnect();
-      } else {
-        GState.adbConnectionDiagnostic.update((_) => "");
-        status = ConnectionStatus.CONNECTED;
-        if (output.contains(RegExp('(^|\\n)127.0.0.1:${GState.androidPort.$}\\s+'))) {
-          if (GState.ipAddress.$ != "127.0.0.1") GState.ipAddress.update((old) => "127.0.0.1");
-        } else if (GState.ipAddress.$ != "localhost") {
-          GState.ipAddress.update((old) => "localhost");
-        }
+    final process = await ADBUtils.devices(long: true);
+    final output = process.stdout?.toString() ?? '';
+    final configuredSerial = ADBUtils.deviceName;
+    final wsaEndpoint = findWsaAdbEndpoint(
+      output,
+      preferredSerial: configuredSerial,
+    );
+
+    if (wsaEndpoint != null) {
+      // Only adopt an alternate endpoint when ADB metadata identifies it as WSA.
+      // A regular phone or emulator is never considered for endpoint adoption.
+      if (GState.ipAddress.$ != wsaEndpoint.host) {
+        GState.ipAddress
+          ..update((_) => wsaEndpoint.host)
+          ..persist();
       }
+      if (GState.androidPort.$ != wsaEndpoint.port) {
+        GState.androidPort
+          ..update((_) => wsaEndpoint.port)
+          ..persist();
+        GState.androidPortPending.$ = wsaEndpoint.port.toString();
+      }
+
+      switch (wsaEndpoint.state) {
+        case 'device':
+          GState.adbConnectionDiagnostic.update((_) => "");
+          status = ConnectionStatus.CONNECTED;
+          break;
+        case 'unauthorized':
+          GState.adbConnectionDiagnostic.update((_) =>
+              'ADB reports ${wsaEndpoint.serial} as unauthorized. The Android authorization prompt may need approval.');
+          status = ConnectionStatus.UNAUTHORIZED;
+          if (prevStatus == ConnectionStatus.UNKNOWN) reconnect();
+          break;
+        case 'offline':
+          GState.adbConnectionDiagnostic.update((_) =>
+              'ADB reports ${wsaEndpoint.serial} as offline.');
+          status = (status == ConnectionStatus.ARRESTED ||
+                  status == ConnectionStatus.STARTING) && shouldWaitStart
+              ? ConnectionStatus.STARTING
+              : ConnectionStatus.OFFLINE;
+          break;
+        case 'host':
+          reconnect();
+          break;
+      }
+    } else {
+      await _tryConnect();
     }
-    //else status = ConnectionStatus.DISCONNECTED;
-    /*if (status != prevStatus) {
-      (alert.title as Text).data = ""
-    }*/
-    else await _tryConnect();
+    // No WSA endpoint was found in the device list, so _tryConnect()
+    // was already attempted in the fallback branch above.
     if (status != prevStatus) GState.connectionStatus.update((p0) => status.statusAlert);
     _statusInitialized = false;
     log("Connection status: ${status.name()}");

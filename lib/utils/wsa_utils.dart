@@ -70,7 +70,7 @@ extension ADBUtils on Future<ProcessResult> {
   static Future<ProcessResult> withAddress(String ipAddress, int port, String command, {String? param, String? workDir}) => withDevice(_toName(ipAddress, port), command, param: param, workDir: workDir);
   static Future<ProcessResult> withWSA(String command, {String? param, String? workDir}) => withDevice(deviceName, command, param: param, workDir: workDir);
 
-  static Future<ProcessResult> devices() => command('devices');
+  static Future<ProcessResult> devices({bool long = false}) => command('devices', param: long ? '-l' : null);
 
   static Future<ProcessResult> disconnect(String device) => command('disconnect', param: device);
   static Future<ProcessResult> disconnectAddress(String ipAddress, int port) => disconnect(_toName(ipAddress, port));

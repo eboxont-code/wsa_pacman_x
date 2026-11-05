@@ -15,6 +15,7 @@ on:
     branches:
       - main
       - fix/direct-apk-launch-and-status
+      - fix/offline-adb-diagnostic
   workflow_dispatch:
 
 permissions:
