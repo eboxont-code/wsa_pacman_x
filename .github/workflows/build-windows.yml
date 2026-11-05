@@ -280,6 +280,8 @@ jobs:
             "InstallWsaAppHooks",
             "RemoveWsaAppHooks",
             "SetWindowsHookExW",
+            "wsa_hook_retry_after_",
+            "GetTickCount64() + 10000",
             "WH_CBT",
             "WH_GETMESSAGE",
             "WH_CALLWNDPROC",
@@ -313,7 +315,11 @@ jobs:
             "ShowWindow(window, SW_HIDE)",
             "kWsaAppTrayCallbackMessage",
             "WsaAppTrayCallWndProc",
-            "WsaAppTrayCallWndRetProc"
+            "WsaAppTrayCallWndRetProc",
+            "LogHookExecutionOnce",
+            "Hook DLL executed inside process.",
+            "GetCurrentProcessId()",
+            "GetCurrentThreadId()"
           )
           foreach ($check in $hookChecks) {
             if ($trayHookSource -notmatch [regex]::Escape($check)) {
