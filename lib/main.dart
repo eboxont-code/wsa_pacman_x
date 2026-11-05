@@ -164,22 +164,27 @@ class WSAPeriodicConnector {
     final process = await ADBUtils.devices();
     final output = process.stdout.toString();
     if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+'))) {
-      if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+offline(\$|\\n|\\s)')))
-        status = (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.STARTING) && shouldWaitStart ? 
-            ConnectionStatus.STARTING : ConnectionStatus.OFFLINE;
-      else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+host(\$|\\n|\\s)'))) {
+      if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+offline(\$|\\n|\\s)'))) {
+        GState.adbConnectionDiagnostic.update((_) =>
+            'ADB reports ${ADBUtils.deviceName} as offline.');
+        status = (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.STARTING) && shouldWaitStart
+            ? ConnectionStatus.STARTING
+            : ConnectionStatus.OFFLINE;
+      } else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+host(\$|\\n|\\s)'))) {
         reconnect();
-      }
-      else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+unauthorized(\$|\\n|\\s)'))) {
+      } else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+unauthorized(\$|\\n|\\s)'))) {
+        GState.adbConnectionDiagnostic.update((_) =>
+            'ADB reports ${ADBUtils.deviceName} as unauthorized. The Android authorization prompt may need approval.');
         status = ConnectionStatus.UNAUTHORIZED;
         if (prevStatus == ConnectionStatus.UNKNOWN) reconnect();
-      }
-      else {
+      } else {
+        GState.adbConnectionDiagnostic.update((_) => "");
         status = ConnectionStatus.CONNECTED;
         if (output.contains(RegExp('(^|\\n)127.0.0.1:${GState.androidPort.$}\\s+'))) {
           if (GState.ipAddress.$ != "127.0.0.1") GState.ipAddress.update((old) => "127.0.0.1");
+        } else if (GState.ipAddress.$ != "localhost") {
+          GState.ipAddress.update((old) => "localhost");
         }
-        else if (GState.ipAddress.$ != "localhost") GState.ipAddress.update((old) => "localhost");
       }
     }
     //else status = ConnectionStatus.DISCONNECTED;
@@ -213,6 +218,13 @@ class WSAPeriodicConnector {
     );
 
     if (outcome == AdbConnectOutcome.failed) {
+      GState.adbConnectionDiagnostic.update((_) => describeAdbConnectFailure(
+        endpoint: ADBUtils.deviceName,
+        exitCode: process.exitCode,
+        stdout: stdout,
+        stderr: stderr,
+        timedOut: process.isTimeout,
+      ));
       if (process.isTimeout) {
         log("ADB connection attempt timed out after 3 seconds");
       } else {
@@ -227,8 +239,15 @@ class WSAPeriodicConnector {
               : ConnectionStatus.OFFLINE
           : ConnectionStatus.DISCONNECTED;
     } else if (outcome == AdbConnectOutcome.unauthorized) {
+      GState.adbConnectionDiagnostic.update((_) => describeAdbConnectFailure(
+        endpoint: ADBUtils.deviceName,
+        exitCode: process.exitCode,
+        stdout: stdout,
+        stderr: stderr,
+      ));
       status = ConnectionStatus.UNAUTHORIZED;
     } else {
+      GState.adbConnectionDiagnostic.update((_) => "");
       status = ConnectionStatus.CONNECTED;
     }
   }
