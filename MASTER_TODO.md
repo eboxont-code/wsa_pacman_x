@@ -31,9 +31,7 @@
 
 ## Current task
 
-- 🔄 **Fix the per-Android-app tray behaviour that failed runtime testing** — the reported failure is that WSA PacMan's own tray icon appears, but individual Android app windows do not get their own tray icons. Focus only on the per-app window hook/injection path and its diagnostics. Do not switch to Grass APK launch troubleshooting.
-- ⏸️ **Automatic WSA Android Developer mode** is parked after CI #196 passed; fresh-install runtime verification is deferred.
-- ⏸️ Grass APK launch investigation is parked and out of scope.
+- 🔄 **Validate per-app hook retry, injection diagnostics, and optional-hook handling in Windows CI** — manager now retries transient failures after 10 seconds, the DLL logs its first execution in the target process, and only CBT + GETMESSAGE are required for core tray behaviour. Windows CI runs #205 and #206 are in progress. Runtime behaviour is not yet verified.
 
 ## Project goal
 
@@ -875,3 +873,15 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Microsoft SetWindowsHookEx documentation confirms cross-process hook procedures must live in a matching-bitness DLL, and thread-specific hooks are supported for WH_CBT, WH_GETMESSAGE, WH_CALLWNDPROC, and WH_CALLWNDPROCRET. The special Windows Store restriction described by Microsoft concerns global hooks with thread ID 0; this implementation passes a specific target thread ID. Source: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowshookexw
 - 🔄 Remediation: allow retry after a bounded cooldown for transient hook installation failures, add a one-time in-target-process callback execution diagnostic, and require these behaviours in CI. This improves recovery/diagnosability without changing the per-app close/restore design.
 - ⏳ No runtime hook diagnostics from the user's machine have been provided in this job yet; code changes alone will not be labelled runtime-verified.
+
+
+### 2026-11-05 — Per-app hook resiliency and target-process diagnostics implemented
+- ✅ Replaced the permanent failed-thread blacklist with a per-thread retry deadline map. DLL-path resolution, DLL loading, incomplete exports, and required-hook registration failures now retry after 10 seconds rather than suppressing attempts for the lifetime of the manager.
+- ✅ Added a parent-side diagnostic when a matching WsaClient window is selected for hook installation, including HWND, PID, and TID.
+- ✅ Added a first-callback marker in the injected hook DLL: `Hook DLL executed inside process. PID=... TID=... first_callback=...`. This provides direct evidence that hook code actually ran in the target WsaClient process.
+- ✅ Changed hook acceptance: `WH_CBT` and `WH_GETMESSAGE` are required core hooks (intercept close and restore from tray); `WH_CALLWNDPROC` and `WH_CALLWNDPROCRET` are an optional paired fallback for direct `WM_CLOSE`. If the optional pair fails, the core hooks remain installed instead of all four hooks being discarded.
+- ✅ Added CI source guards for retry deadlines, target-process execution logging, and optional fallback handling.
+- ✅ Files changed: `windows/runner/win32_window.h`, `windows/runner/win32_window.cpp`, `windows/runner/app_tray_hook.cpp`, `.github/workflows/build-windows.yml`.
+- ✅ Intermediate CI run #201 (run ID `41957976735`) passed after the retry mechanism and injected-process diagnostic changes. An intermediate commit before the manager implementation was synchronized failed compilation as expected; it was superseded.
+- 🔄 Latest Windows CI runs: #205 (run ID `41958305351`) validates retry/injection changes; #206 (run ID `41958321969`) includes the optional-hook fallback change. Both are currently in progress.
+- ⚠️ No user-machine runtime log has been read during this job. Code/CI success will not be reported as proof of per-app tray runtime success.
