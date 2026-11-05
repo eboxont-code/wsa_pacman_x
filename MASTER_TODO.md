@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Investigate and implement automatic WSA Android Developer mode enablement on first install** — user reports Developer mode was OFF after the first WSA install and requests that the project enable it automatically. Determine whether the WSA package/configuration exposes a supported first-install mechanism; do not confuse Android WSA Developer mode with Windows OS Developer Mode. Prefer a supported, reversible approach and do not alter existing WSA user data or either Grass installation.
+- 🔄 **Implement first-install WSA Developer mode enablement in the runtime installer** — patch only the current user's WSA `settings.dat` value `DeveloperModeEnabled` after a fresh AppX registration. Preserve the complete hive and all other values; use a backup and strict format checks. Existing WSA installations must remain untouched. Do not confuse WSA Android Developer mode with Windows OS Developer Mode.
 
 ## Project goal
 
@@ -358,3 +358,12 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Preserve distinction: this is the WSA Settings > Advanced settings > Developer mode switch (the setting that exposes Android debugging/ADB), not Windows Settings > System > For developers / Windows Developer Mode.
 - ⏸️ Previous WSA startup/ADB investigation is paused. Latest observations remain: Developer mode was later turned ON by the user, WSA Settings > Files hung, WsaClient ran with `/partiallyrunning`, and ADB became disconnected. Those are separate outstanding diagnostics and do not prove the Developer-mode toggle itself caused all startup symptoms.
 - 🔄 Current task: inspect the installer and WSA package configuration for a supported first-install switch or a safe post-install enabling mechanism. Do not modify code until the mechanism and its limitations are established. Preserve WSA user data and the separate Windows Grass app.
+
+
+### 2026-11-05 — Automatic Developer mode implementation research
+- ✅ Confirmed the repo's runtime installer `wsa-runtime/Install-WSA.ps1` registers the WSA AppX package in `Install-WsaFromFolder`; the outer script exits without touching an existing registered WSA package and also stops if old `Userdata.vhdx` remains. The fresh-install path is therefore the correct place for this feature.
+- ✅ Confirmed WSA stores its app settings in the user's package data hive at `%LOCALAPPDATA%\\Packages\\<PackageFamilyName>\\Settings\\settings.dat`. A forensic paper identifies `DeveloperModeEnabled` as a field in this registry hive alongside other WSA settings. Source: https://dcollection.korea.ac.kr/public_resource/pdf/000000270264_20260118213301.pdf
+- ✅ Found community WSA tooling that enables WSA Developer mode by modifying the `DeveloperModeEnabled` value in the mounted `settings.dat` hive. An example uses custom registry type `0x05F5E10B` and a 9-byte payload whose first byte is the enabled flag. Source: https://4pda.to/forum/index.php?showtopic=1035138&st=760
+- ⚠️ Rejected the alternative of copying another project's complete pre-patched `settings.dat` over the user's hive: that would replace unrelated WSA settings. The implementation will instead load the fresh-install hive and change only the first byte of the existing `DeveloperModeEnabled` value, preserving its original type and remaining bytes.
+- ✅ Distinguished WSA Android Developer mode from Windows OS Developer Mode. No Windows AppModelUnlock registry settings will be changed.
+- 🔄 Implementation plan: after fresh WSA package registration, initialize the per-user settings hive if needed, close only the WSA Settings process for this package, back up `settings.dat`, update only `DeveloperModeEnabled` through Windows registry APIs while the hive is mounted, verify the value, and unload the hive. If the value/schema is unexpected or the hive cannot safely be loaded, leave WSA intact and report a manual fallback.
