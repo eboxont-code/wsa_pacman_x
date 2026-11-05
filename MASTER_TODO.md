@@ -864,3 +864,14 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Parked automatic WSA Android Developer mode after CI #196; its fresh-install test is not the active task.
 - ✅ Parked the separate Grass APK investigation; do not return to it unless the user explicitly asks.
 - 🔄 Current task: inspect the per-app hook implementation, process/window discovery, hook installation errors, DLL exports/loading, and recorded diagnostics. Work only on this per-app tray behaviour until this task is fixed or a precise external runtime dependency is identified.
+
+
+### 2026-11-05 — Per-app tray code review before remediation
+- ✅ Re-read the top-level TODO and confirmed the reported runtime failure: WSA PacMan's own tray icon appeared, but Android app windows did not get individual icons.
+- ✅ Inspected `windows/runner/win32_window.cpp`, `win32_window.h`, `app_tray_hook.cpp`, `app_tray_hook.h`, `CMakeLists.txt`, and the Windows CI workflow.
+- ✅ Confirmed manager enumerates visible top-level windows and matches processes by executable basename `WsaClient.exe`; it then installs four thread-specific hooks (CBT, GETMESSAGE, CALLWNDPROC, CALLWNDPROCRET) from the bundled DLL.
+- ⚠️ Identified a recovery weakness: any transient DLL-load/export/hook-registration failure adds the WSA thread ID to `failed_wsa_hook_threads_`, which permanently suppresses another attempt until all hooks are removed. The manager scans each second, but this failure set prevents recovery if the first attempt happens before the target thread is ready.
+- ⚠️ The current injected DLL logs close and tray events, but has no explicit first-execution marker proving that the hook procedure actually ran inside the target WsaClient process. Thus current diagnostics cannot directly distinguish "hook registered but never injected/executed" from "hook callback executing but not seeing close."
+- ✅ Microsoft SetWindowsHookEx documentation confirms cross-process hook procedures must live in a matching-bitness DLL, and thread-specific hooks are supported for WH_CBT, WH_GETMESSAGE, WH_CALLWNDPROC, and WH_CALLWNDPROCRET. The special Windows Store restriction described by Microsoft concerns global hooks with thread ID 0; this implementation passes a specific target thread ID. Source: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowshookexw
+- 🔄 Remediation: allow retry after a bounded cooldown for transient hook installation failures, add a one-time in-target-process callback execution diagnostic, and require these behaviours in CI. This improves recovery/diagnosability without changing the per-app close/restore design.
+- ⏳ No runtime hook diagnostics from the user's machine have been provided in this job yet; code changes alone will not be labelled runtime-verified.
