@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_value/shared_value.dart';
 import 'package:wsa_pacman/io/isolate_runner.dart';
 import 'package:wsa_pacman/utils/misc_utils.dart';
+import 'package:wsa_pacman/utils/adb_connection.dart';
 import 'package:wsa_pacman/utils/wsa_utils.dart';
 import 'package:wsa_pacman/utils/locale_utils.dart';
 import 'package:wsa_pacman/widget/themed_pane_item.dart';
@@ -109,8 +110,29 @@ class WSAPeriodicConnector {
   static WSAStatusAlert alertStatus = ConnectionStatus.UNKNOWN.statusAlert;
   static bool _statusInitialized = false;
 
+  static bool _connectionCheckInProgress = false;
+
   static void _checkConnectionStatus() async {
-    if (_statusInitialized) {
+    // Timer.periodic does not wait for async callbacks. Do not overlap slow
+    // WSA/ADB probes when startup takes longer than a normal polling interval.
+    if (_connectionCheckInProgress) return;
+    _connectionCheckInProgress = true;
+    try {
+      await _checkConnectionStatusOnce();
+    } catch (error, stackTrace) {
+      log("WSA/ADB connection check failed: $error\\n$stackTrace");
+      final fallbackStatus = Env.WSA_INSTALLED
+          ? ConnectionStatus.OFFLINE
+          : ConnectionStatus.DISCONNECTED;
+      if (status != fallbackStatus) {
+        GState.connectionStatus.$ = (status = fallbackStatus).statusAlert;
+      }
+    } finally {
+      _connectionCheckInProgress = false;
+    }
+  }
+
+  static Future<void> _checkConnectionStatusOnce() async {    if (_statusInitialized) {
       Process.run('${Env.SYSTEM_ROOT}\\System32\\tasklist.exe', []).then((result){
         if (!result.stdout.toString().contains(RegExp(r'(^|\n)adb.exe\s+'))) {
           status = ConnectionStatus.UNKNOWN;
@@ -175,13 +197,39 @@ class WSAPeriodicConnector {
   }
 
   static Future<void> _tryConnect() async {
-    ProcessResult? process = await ADBUtils.connectWSA().processTimeout(const Duration(milliseconds: 200));
-    if (process.stdout?.toString().contains(RegExp(r'(^|\n)(cannot|failed to) connect\s.*')) ?? true) 
-      status = Env.WSA_INSTALLED ? (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.STARTING) && shouldWaitStart ? 
-          ConnectionStatus.STARTING : ConnectionStatus.OFFLINE : ConnectionStatus.DISCONNECTED;
-    else if (process.stdout?.toString().contains(RegExp(r'(^|\n)(cannot|failed to) authenticate\s.*')) ?? true) 
+    // On Windows, starting adb.exe/server can exceed 200 ms, especially just
+    // after WSA boots. Keep this below the five-second polling interval.
+    final ProcessResult process = await ADBUtils.connectWSA()
+        .processTimeout(const Duration(seconds: 3));
+    final stdout = process.stdout?.toString() ?? '';
+    final stderr = process.stderr?.toString() ?? '';
+    final output = '$stdout\\n$stderr';
+    final outcome = classifyAdbConnectOutcome(
+      exitCode: process.exitCode,
+      stdout: stdout,
+      stderr: stderr,
+      timedOut: process.isTimeout,
+    );
+
+    if (outcome == AdbConnectOutcome.failed) {
+      if (process.isTimeout) {
+        log("ADB connection attempt timed out after 3 seconds");
+      } else {
+        log("ADB connection attempt failed (exit code: " +
+            process.exitCode.toString() + "): " + output);
+      }
+      status = Env.WSA_INSTALLED
+          ? (status == ConnectionStatus.ARRESTED ||
+                  status == ConnectionStatus.STARTING)
+              && shouldWaitStart
+              ? ConnectionStatus.STARTING
+              : ConnectionStatus.OFFLINE
+          : ConnectionStatus.DISCONNECTED;
+    } else if (outcome == AdbConnectOutcome.unauthorized) {
       status = ConnectionStatus.UNAUTHORIZED;
-    else status = ConnectionStatus.CONNECTED;
+    } else {
+      status = ConnectionStatus.CONNECTED;
+    }
   }
 }
 
