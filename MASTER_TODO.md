@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Locate the live WSA ADB endpoint** — WSA service/client/VM and PacMan processes are present, and the local ADB server is listening on `127.0.0.1:5037` (PID `4140`), but `adb devices -l` is empty and no listener/connection for the former `58526` endpoint was shown. Inspect current WSA process IDs/command lines and their sockets before reconnecting. Do not launch Grass until ADB is connected; do not touch the separate Windows Grass app.
+- 🔄 **Identify why WSA has no ADB listener/transport despite active processes** — latest snapshot: `WsaClient.exe` PID `24272`, `WsaService.exe` PID `25188`, `vmmemWSA` PID `25320`, `WSACrashUploader.exe` PID `26100`, and `WSA-pacman.exe` PID `28796`; no TCP connections were returned for those process IDs. Check all high listening ports and the untruncated WSA client command line. Do not launch Grass until ADB reconnects; do not touch the separate Windows Grass desktop app.
 
 ## Project goal
 
@@ -315,3 +315,12 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ⚠️ No TCP entry for old endpoint `58526` was present in the supplied filtered output; do not assume it remains WSA's current endpoint.
 - ⚠️ The current ADB server is running, but has zero attached Android transports. Distinguish ADB server availability (port `5037`) from WSA device connectivity.
 - 🔄 Next: inspect current WSA client/service command lines and sockets by their live PIDs; do not retry package/launch commands until `adb devices` shows an attached device.
+
+
+### 2026-11-05 — WSA process command lines and owned sockets
+- ✅ User reran the read-only WSA process/socket inventory.
+- ✅ Current process snapshot: `WSACrashUploader.exe` PID `26100`; `WSA-pacman.exe` PID `28796`; `WsaClient.exe` PID `24272`; `WsaService.exe` PID `25188`; `vmmemWSA` PID `25320`.
+- ✅ Process paths confirm `WsaClient.exe` is under `C:\\ProgramData\\WSABuilds\\WSA-Windows_11_2407.40000.4.0_LTS_8\\WSA_2407.40000.4.0_x64\\WsaClient\\WsaClient.exe` and PacMan is under `C:\\Program Files\\WSA PacMan\\WSA-pacman.exe`.
+- ✅ `Get-NetTCPConnection` filtered to these WSA/PacMan process IDs returned no rows.
+- ⚠️ Empty process-owned socket output does not establish that no WSA endpoint exists; the endpoint may be owned by another Windows process or may not be listening.
+- 🔄 Next: enumerate listening high TCP ports and print full WSA client/service command lines to identify any current ADB endpoint or startup mode.
