@@ -175,6 +175,27 @@ jobs:
           }
 
           $installerText = Get-Content "installer/installer.iss" -Raw
+          $requiredUninstallSettings = @(
+            "Uninstallable=yes",
+            "CreateUninstallRegKey=yes",
+            "UninstallDisplayName=WSA PacMan",
+            'Name: "{group}\\Uninstall WSA PacMan"; Filename: "{uninstallexe}"',
+            'Type: filesandordirs; Name: "{app}\\*"',
+            'Type: filesandordirs; Name: "{userprofile}\\.wsa-pacman"',
+            'Type: filesandordirs; Name: "{userprofile}\\.wsamanager"'
+          )
+          foreach ($check in $requiredUninstallSettings) {
+            if (-not $installerText.Contains($check)) {
+              throw "Required WSA PacMan uninstall behavior is missing: $check"
+            }
+          }
+          if ($installerText -notmatch "(?s)\\[UninstallDelete\\](.*?)(?:\\r?\\n\\[|$)") {
+            throw "The installer must define an UninstallDelete section"
+          }
+          $uninstallDeleteSection = $Matches[1]
+          if ($uninstallDeleteSection -match '(?im)^\\s*Type:\\s*filesandordirs;\\s*Name:\\s*"[^"]*(?:WSABuilds|ProgramData)') {
+            throw "Uninstall must not delete the separately installed WSA runtime under ProgramData"
+          }
           if ($installerText -notmatch "Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime") {
             throw "The Android runtime helper must run hidden and finish before installer completion"
           }
