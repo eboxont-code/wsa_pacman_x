@@ -16,6 +16,7 @@ on:
       - main
       - fix/direct-apk-launch-and-status
       - fix/offline-adb-diagnostic
+      - fix/auto-detect-wsa-adb-endpoint
   workflow_dispatch:
 
 permissions:
