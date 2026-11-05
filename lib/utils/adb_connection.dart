@@ -15,16 +15,16 @@ AdbConnectOutcome classifyAdbConnectOutcome({
 }) {
   if (timedOut) return AdbConnectOutcome.failed;
 
-  final output = '$stdout\\n$stderr';
+  final output = '$stdout\n$stderr';
   if (RegExp(
-    r'(^|\\n)(cannot|failed to) connect\\s.*',
+    r'(^|\n)(cannot|failed to) connect\s.*',
     caseSensitive: false,
   ).hasMatch(output)) {
     return AdbConnectOutcome.failed;
   }
 
   if (RegExp(
-    r'(^|\\n)(cannot|failed to) authenticate\\s.*',
+    r'(^|\n)(cannot|failed to) authenticate\s.*',
     caseSensitive: false,
   ).hasMatch(output)) {
     return AdbConnectOutcome.unauthorized;
