@@ -255,11 +255,12 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 
 
 ### 2026-11-05 — Master TODO audit and logging rule
-- 🔄 Started a full audit because the user requested that all prior work missing from this Markdown be added and that every future job be recorded.
+- ✅ Completed the full audit requested by the user: reconciled all recent WSA/Grass troubleshooting actions and added the permanent rule to log every future project job.
 - ✅ Re-read the full `MASTER_TODO.md` and fetched PR #12 metadata. PR #12 remains open, unmerged, targets `main`; latest head before this synchronization was `535e7df83a4ae0af3357bae55c81d3534f00a89c`.
 - ✅ Corrected the stale Current task text: ADB is connected at `127.0.0.1:58526 device`; Android package status is the pending task.
 - ✅ Added the WSA AppX package version/status, manifest app IDs, successful AppsFolder launch, WSA process inventory, PacMan executable/PID, actual bundled ADB path, first failed process-name lookup, and successful ADB device result.
 - ✅ Added a dedicated chronological WSA/Android troubleshooting record and preserved the explicit exclusion of the separate Windows Grass desktop application.
 - ✅ Added a permanent rule: every requested project job must be logged, including read-only checks, troubleshooting, research, review, planning, documentation, builds, and tests. Record important one-line commands, outputs/evidence, decisions, changes, commits, verification, failures/blockers, and next steps.
 - ✅ Restated the completion rule: a job is not complete until its work-log and current status are updated in this file.
+- ✅ Audit documentation commit: `5f5a9a0428992047139db4a0f361b4e2fc504218`; this final tidy-up commit records audit completion.
 - ⏳ Current follow-on task remains waiting for the user's output from the pending Android boot/package/activity query.
