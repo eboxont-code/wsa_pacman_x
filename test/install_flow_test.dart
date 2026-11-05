@@ -83,4 +83,71 @@ void main() {
       );
     });
   });
+
+  group('shouldRefreshInstallType', () {
+    test('retries an unknown install type after ADB reconnects', () {
+      expect(
+        shouldRefreshInstallType(
+          isConnected: true,
+          hasUnknownInstallType: true,
+          hasPackage: true,
+          hasVersionCode: true,
+          refreshInProgress: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not query while ADB is offline', () {
+      expect(
+        shouldRefreshInstallType(
+          isConnected: false,
+          hasUnknownInstallType: true,
+          hasPackage: true,
+          hasVersionCode: true,
+          refreshInProgress: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('waits until package metadata is ready', () {
+      expect(
+        shouldRefreshInstallType(
+          isConnected: true,
+          hasUnknownInstallType: true,
+          hasPackage: false,
+          hasVersionCode: true,
+          refreshInProgress: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('does not overlap an install-type query', () {
+      expect(
+        shouldRefreshInstallType(
+          isConnected: true,
+          hasUnknownInstallType: true,
+          hasPackage: true,
+          hasVersionCode: true,
+          refreshInProgress: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('does not repeat a successful install-type inspection', () {
+      expect(
+        shouldRefreshInstallType(
+          isConnected: true,
+          hasUnknownInstallType: false,
+          hasPackage: true,
+          hasVersionCode: true,
+          refreshInProgress: false,
+        ),
+        isFalse,
+      );
+    });
+  });
 }
