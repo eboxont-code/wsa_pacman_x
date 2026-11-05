@@ -181,4 +181,10 @@ Every Android app window running under WSA must behave independently in the Wind
 
 ### 2026-11-05 — WSA launch entry point confirmed
 - ✅ `Get-AppxPackageManifest` lists application ID `App`, executable `WsaClient\\WsaClient.exe`, entry point `Windows.FullTrustApplication`; `SettingsApp` is the settings application.
-- ⏳ Next: launch WSA through the registered AppsFolder identity and confirm its client process becomes available before retrying ADB.
+- ✅ Launched WSA through its registered AppsFolder identity; `WsaClient.exe` is running (PID `19080`, observed by user).
+- ⏳ Next: query PacMan's bundled ADB for device visibility, then inspect Android boot/package state.
+
+
+### 2026-11-05 — WSA client successfully started
+- ✅ User launched `shell:AppsFolder\\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe!App`; PowerShell confirmed `WsaClient.exe` PID `19080` under the installed WSA directory.
+- ⏳ Next: re-check ADB device visibility and, if connected, query installed Android package `io.getgrass.www` and launch logs.
