@@ -18,7 +18,7 @@ on:
       - fix/offline-adb-diagnostic
       - fix/auto-detect-wsa-adb-endpoint
       - fix/offline-open-wsa-settings
-      - test/apk-flow-e2e
+      - fix/guided-developer-mode-retry
   workflow_dispatch:
 
 permissions:
