@@ -32,6 +32,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 DefaultDirName={autopf}\WSA PacMan
 DefaultGroupName=WSA PacMan
+Uninstallable=yes
+CreateUninstallRegKey=yes
+UninstallDisplayName=WSA PacMan
 UninstallDisplayIcon={app}\{#executable}
 Compression=lzma2
 SolidCompression=yes
@@ -86,6 +89,15 @@ Name: "{group}\Install matching WSA Android runtime"; \
   Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\wsa-runtime\Install-WSA.ps1"""; \
   WorkingDir: "{app}\wsa-runtime"; IconFilename: "{app}\{#executable}"
+
+Name: "{group}\Uninstall WSA PacMan"; Filename: "{uninstallexe}"; IconFilename: "{app}\{#executable}"
+
+[UninstallDelete]
+; Inno automatically removes files/folders recorded from the [Files] section.
+; Explicitly remove this user's PacMan settings and legacy settings folder only.
+; Keep WSA itself under ProgramData\WSABuilds.
+Type: filesandordirs; Name: "{%USERPROFILE}\.wsa-pacman"
+Type: filesandordirs; Name: "{%USERPROFILE}\.wsamanager"
 
 [Code]
 
