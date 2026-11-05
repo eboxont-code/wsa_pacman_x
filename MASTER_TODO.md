@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Remove the X button from every WSA Android app window** — live per-app tray interception did not work on the user's WSA desktop. Current change removes `WS_SYSMENU` from each WSA app window at activation and immediately after hook installation. This removes X completely but also removes the standard Minimize/Maximize buttons and system menu. Need Windows CI + EXE installer, then live confirmation that Android app windows no longer show X and PacMan is unchanged.
+- ⏳ **Live verification of the per-app no-X build** — Windows CI run #262 passed and the EXE installer is extracted and checksum-verified. Need the user to confirm the X is removed from WSA Android app windows, that their windows remain usable, and that PacMan itself is unchanged.
 
 ## Project goal
 
@@ -940,3 +940,10 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Apply removal on `HCBT_ACTIVATE`, on the next queued message, and immediately after hooks are installed by posting `WM_NULL` to the target WSA UI thread. PacMan's own window is not changed.
 - ✅ Added CI source guards for `WS_SYSMENU` removal, frame refresh, CBT activation handling, and initial target-thread kick.
 - ⏳ Need a Windows build/EXE installer and a real WSA desktop smoke test. Verify the X disappears from Android windows, note that Minimize/Maximize and system menu also disappear, and confirm PacMan's own window remains unchanged.
+
+### 2026-11-05 — Per-app no-X installer built and verified
+- ✅ Corrected the CI guard placement and reran Windows workflow run #262 (ID `42019304308`) for source head `cdde17ae14873164bc306725497e35d3aa79c0f8`.
+- ✅ All workflow steps passed: source validation, Windows build, hook DLL packaging, Inno Setup installer build, and artifact upload.
+- ✅ GitHub artifact ID `13411355766`; outer ZIP SHA-256 `4cf3edca5bbdd331d2aff8daa550965d6b7c2798f75520c0c86d0b671900d0c9`; artifact expires `2026-11-19T11:33:00Z`.
+- ✅ Extracted Windows installer EXE `WSA-PacMan-no-X-v1.5.0-setup.exe` (37,104,568 bytes); SHA-256 `719a8cc5898ceffe5c90928bcfea563c2e49ed119eac82144e54bf6110f0a78c`.
+- ⏳ Live WSA desktop test remains required. Confirm X removed only from Android app windows, explain expected loss of standard Minimize/Maximize/system menu, verify app remains open, and confirm PacMan manager unaffected.
