@@ -31,7 +31,7 @@
 
 ## Current task
 
-- ⏳ **Verify the Android Grass package and launch behaviour** — WSA is running and ADB now sees `127.0.0.1:58526 device`. Waiting for the user to run the pending boot/package/activity query below. The Windows Grass desktop app remains explicitly excluded.
+- 🔄 **Launch-test the installed Android Grass APK and capture runtime errors** — Android boot is complete, package `io.getgrass.www` is installed, and launcher activity `io.getgrass.www/.MainActivity` resolves. Next run an explicit activity launch and inspect logcat. Do not touch the separate Windows Grass desktop app.
 
 ## Project goal
 
@@ -263,4 +263,14 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Added a permanent rule: every requested project job must be logged, including read-only checks, troubleshooting, research, review, planning, documentation, builds, and tests. Record important one-line commands, outputs/evidence, decisions, changes, commits, verification, failures/blockers, and next steps.
 - ✅ Restated the completion rule: a job is not complete until its work-log and current status are updated in this file.
 - ✅ Audit documentation commit: `5f5a9a0428992047139db4a0f361b4e2fc504218`; this final tidy-up commit records audit completion.
-- ⏳ Current follow-on task remains waiting for the user's output from the pending Android boot/package/activity query.
+- ✅ The Android boot/package/activity query has now returned: boot status `1`, APK path `/data/app/~~-bkncMcgtzCjZphZfapDdw==/io.getgrass.www-zdIBPlk_oKlIZGPGuIzijA==/base.apk`, and resolved activity `io.getgrass.www/.MainActivity`.
+- 🔄 Follow-on task: explicitly launch the Grass activity and inspect runtime/logcat output.
+
+
+### 2026-11-05 — Android Grass package and activity verified
+- ✅ User ran the bundled ADB diagnostic against serial `127.0.0.1:58526`.
+- ✅ Android boot status: `getprop sys.boot_completed` returned `1`.
+- ✅ Android package is installed: `pm path io.getgrass.www` returned `package:/data/app/~~-bkncMcgtzCjZphZfapDdw==/io.getgrass.www-zdIBPlk_oKlIZGPGuIzijA==/base.apk`.
+- ✅ Android resolves the launcher activity: `cmd package resolve-activity --brief io.getgrass.www` returned `io.getgrass.www/.MainActivity` (priority 0; not default).
+- ✅ This proves WSA boot, package installation, and activity resolution. It does **not** yet prove Grass opens successfully.
+- 🔄 Current job: start `io.getgrass.www/.MainActivity` explicitly and capture Android runtime errors if it exits or fails to display. Keep the separate Windows Grass app untouched.
