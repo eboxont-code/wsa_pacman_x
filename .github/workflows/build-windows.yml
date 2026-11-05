@@ -321,7 +321,14 @@ jobs:
             "LogHookExecutionOnce",
             "Hook DLL executed inside process.",
             "GetCurrentProcessId()",
-            "GetCurrentThreadId()"
+            "GetCurrentThreadId()",
+            "GetModuleFileNameW(nullptr",
+            "does not belong to the injected WsaClient process",
+            "WH_GETMESSAGE received queued WM_CLOSE",
+            "WH_GETMESSAGE received queued SC_CLOSE",
+            "Queued Android app close intercepted",
+            "close message replaced with WM_NULL",
+            "Shell_NotifyIconW(NIM_ADD) failed for HWND="
           )
           foreach ($check in $hookChecks) {
             if ($trayHookSource -notmatch [regex]::Escape($check)) {
