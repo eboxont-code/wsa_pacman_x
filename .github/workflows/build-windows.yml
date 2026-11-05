@@ -179,10 +179,10 @@ jobs:
             "Uninstallable=yes",
             "CreateUninstallRegKey=yes",
             "UninstallDisplayName=WSA PacMan",
-            'Name: "{group}\\Uninstall WSA PacMan"; Filename: "{uninstallexe}"',
-            'Type: filesandordirs; Name: "{app}\\*"',
-            'Type: filesandordirs; Name: "{userprofile}\\.wsa-pacman"',
-            'Type: filesandordirs; Name: "{userprofile}\\.wsamanager"'
+            'Name: "{group}\Uninstall WSA PacMan"; Filename: "{uninstallexe}"',
+            'Type: filesandordirs; Name: "{app}\*"',
+            'Type: filesandordirs; Name: "{userprofile}\.wsa-pacman"',
+            'Type: filesandordirs; Name: "{userprofile}\.wsamanager"'
           )
           foreach ($check in $requiredUninstallSettings) {
             if (-not $installerText.Contains($check)) {
