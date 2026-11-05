@@ -31,7 +31,7 @@
 
 ## Current task
 
-- ⏳ **Runtime verification of the updated per-app tray hooks** — retry, target-process execution diagnostics, and optional-hook handling passed Windows CI #206. The next proof is a real WSA session: confirm WsaClient windows are discovered, injected callback logs appear, and closing/restoring one Android window affects only that app. Code/build success alone is not runtime proof.
+- ⏳ **Runtime verification of the updated per-app tray hooks** — CI #206 passed and a checksum-verified installer/portable build is ready. Still need runtime evidence from the user's WSA desktop: window discovery, hook registration, injected callback execution, NIM_ADD, and one-app-only close/restore. Do not claim runtime success before that evidence.
 
 ## Project goal
 
@@ -896,3 +896,13 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ⚠️ The workflow run tested code head `c01fb3f5be1c4122341421c33280eb07b5f3a121`; the branch then advanced with TODO documentation commit(s). No source changes were made after the tested code head in this job.
 - ✅ PR #12 remains OPEN and UNMERGED, targeting `main`.
 - ⏳ Remaining: real WSA runtime test with the updated package and inspect `%TEMP%\\WsaPacMan-AppTray-Diagnostics.log`. Specifically confirm a `Hook DLL executed inside process` line with WsaClient PID, hook registration results, and per-app NIM_ADD outcome. The close/restore operation must affect exactly one app window.
+
+
+### 2026-11-05 — Test installer artifact downloaded and verified
+- ✅ Downloaded GitHub Actions artifact `13383843525` (run #206) for the updated per-app tray build.
+- ✅ Outer artifact ZIP: `WSA-PacMan-per-app-tray-test.zip`, 53,862,765 bytes, SHA-256 `7e340896b741ee70359d04174fdbeae9d62b936ce7c67373c508b7cf1166a7cc` (matches the GitHub artifact digest).
+- ✅ Extracted installer: `WSA-PacMan-per-app-tray-test-installer.exe`, SHA-256 `1133698c4cae08b68f84e81f870cb0c7dd8db1aa0a2a402da3d82d025e5914c2`.
+- ✅ Extracted portable package: `WSA-PacMan-per-app-tray-test-portable.zip`, SHA-256 `6bcd91e4b635400a1b39786c0d677ef5e26318fdeb0142bb4f9c96f7624056cf`.
+- ✅ Inspected outer artifact listing; it contains exactly the portable package and Windows installer.
+- ✅ Branch includes only the TODO documentation commit after tested source head `c01fb3f5be1c4122341421c33280eb07b5f3a121`; no source code changed after the run #206 build.
+- ⏳ Next: use the test installer/package and inspect `%TEMP%\\WsaPacMan-AppTray-Diagnostics.log` on the WSA machine. Look for matched WsaClient HWND/PID/TID, each hook registration status, `Hook DLL executed inside process`, and `Per-app notification icon successfully added` or a specific failure. Runtime behaviour is still unverified.
