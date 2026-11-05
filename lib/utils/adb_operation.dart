@@ -27,7 +27,7 @@ void requireAdbCommandSuccess({
       stdout.toString().trim(),
     if (stderr != null && stderr.toString().trim().isNotEmpty)
       stderr.toString().trim(),
-  ].join('\\n');
+  ].join('\n');
 
   throw AdbCommandFailure(operation, exitCode, output);
 }
