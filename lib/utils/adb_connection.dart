@@ -89,10 +89,9 @@ bool _isIpv4Address(String value) {
 
 /// Finds a unique WSA endpoint from adb devices -l.
 ///
-/// WSA identifies itself with product/device windows_x86_64. A preferred
-/// configured endpoint wins when present. Otherwise, an alternate endpoint is
-/// only selected when exactly one WSA device is reported, avoiding accidental
-/// switching to a phone or to one of several WSA instances.
+/// WSA identifies itself with product/device windows_x86_64. A configured
+/// endpoint is retained when responding; a unique responding WSA alternate
+/// replaces a stale offline endpoint. Ambiguous instances are never guessed.
 WsaAdbEndpoint? findWsaAdbEndpoint(
   String devicesOutput, {
   String? preferredSerial,
