@@ -132,6 +132,16 @@ void main() {
       );
     });
 
+    test('prefers a responding alternate endpoint over the configured offline one', () {
+      final output =
+          '127.0.0.1:58526 offline product:windows_x86_64 model:Subsystem_for_Android_TM_\n'
+          '172.21.210.88:5555 device product:windows_x86_64 model:Subsystem_for_Android_TM_\n';
+      expect(
+        findWsaAdbEndpoint(output, preferredSerial: '127.0.0.1:58526')?.serial,
+        '172.21.210.88:5555',
+      );
+    });
+
     test('ignores malformed endpoints and invalid ports', () {
       final endpoint = findWsaAdbEndpoint(
         '999.1.1.1:5555 device product:windows_x86_64\n'
