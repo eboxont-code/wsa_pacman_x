@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Collect WSA startup event logs and current Developer-page endpoint** — Developer mode is ON, but WSA Settings > Files remains stuck loading and ADB has no attached device. Do not assume `127.0.0.1:58526` is still current; use the address/port shown on the WSA Developer page when available. Identify relevant WSA event channels and recent errors. Do not launch Grass until Android is reachable; do not touch the separate Windows Grass desktop app.
+- 🔄 **Investigate and implement automatic WSA Android Developer mode enablement on first install** — user reports Developer mode was OFF after the first WSA install and requests that the project enable it automatically. Determine whether the WSA package/configuration exposes a supported first-install mechanism; do not confuse Android WSA Developer mode with Windows OS Developer Mode. Prefer a supported, reversible approach and do not alter existing WSA user data or either Grass installation.
 
 ## Project goal
 
@@ -351,3 +351,10 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Research checked the WSABuilds ADB guide: connect using the IP address and port actually shown in WSA Developer settings; do not assume a previous endpoint remains current. Source: https://github.com/MustardChef/WSABuilds/blob/master/MagiskOnWSA/docs/Guides/ADB-Sideloading.md
 - ✅ WSA-Sideloader usage guide advises checking/allowing the ADB authorization prompt and notes that Developer mode can be toggled off/on to recover a failed ADB connection. Source: https://github.com/MustardChef/WSABuilds/blob/master/Documentation/Usage%20Guides/Sideloading%20Guides/WSA-Sideloader.md
 - 🔄 Next: enumerate Windows event channels related to WSA/Android/Hyper-V and inspect recent errors; also read the current IP/port displayed on the WSA Developer page if it becomes available. No Grass launch attempt yet.
+
+
+### 2026-11-05 — New requested job: enable WSA Developer mode automatically
+- 🔄 User asks to make WSA's Android **Developer mode** turn on automatically during first install; they report it was OFF after their initial installation.
+- ✅ Preserve distinction: this is the WSA Settings > Advanced settings > Developer mode switch (the setting that exposes Android debugging/ADB), not Windows Settings > System > For developers / Windows Developer Mode.
+- ⏸️ Previous WSA startup/ADB investigation is paused. Latest observations remain: Developer mode was later turned ON by the user, WSA Settings > Files hung, WsaClient ran with `/partiallyrunning`, and ADB became disconnected. Those are separate outstanding diagnostics and do not prove the Developer-mode toggle itself caused all startup symptoms.
+- 🔄 Current task: inspect the installer and WSA package configuration for a supported first-install switch or a safe post-install enabling mechanism. Do not modify code until the mechanism and its limitations are established. Preserve WSA user data and the separate Windows Grass app.
