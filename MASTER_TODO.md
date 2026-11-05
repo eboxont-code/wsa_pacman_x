@@ -31,7 +31,8 @@
 
 ## Current task
 
-- ⏳ **Fresh-install runtime verification of automatic WSA Developer mode** — installer code, PowerShell parsing, embedded C# registry-helper compilation, Windows application build, portable package, and installer build all passed CI run #187. A fresh WSA installation is required to exercise the `settings.dat` change. Do not modify the user's existing WSA installation or either Grass application.
+- ⏳ **Fresh-install runtime verification of automatic WSA Android Developer mode** — installer implementation and CI run #187 passed; actual first-install behaviour still needs a fresh WSA installation. Do not modify the user's existing WSA installation.
+- **Scope guard:** the active work is WSA Android Developer mode auto-enablement only. The unrelated Grass APK launch investigation is paused and must not drive the current task unless the user explicitly asks to resume it.
 
 ## Project goal
 
@@ -813,3 +814,10 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ The implementation changes only fresh WSA installs after successful AppX registration. Existing package early-exit and userdata protection paths remain untouched.
 - ⚠️ CI proves parser/static checks, C# compilation, and Windows package build; it does **not** prove that a fresh WSA installation successfully creates and patches its live `settings.dat` hive.
 - ⏳ Fresh-install runtime test remains outstanding. User's currently installed WSA must not be altered just to test this; test only on a separate clean WSA installation or after an explicit user-authorized clean install with backup.
+
+
+### 2026-11-05 — Scope correction: automatic Developer mode only
+- ✅ User clarified that the active focus must remain automatic WSA Android Developer mode, not Grass troubleshooting.
+- ✅ Parked the unrelated Grass APK launch investigation; it is not the current task and will not be pursued unless explicitly requested.
+- ✅ Reaffirmed the current technical milestone: validate the existing fresh-install `settings.dat` patch that sets WSA's Android `DeveloperModeEnabled` value; existing WSA installation must remain untouched.
+- ⏳ Remaining evidence: run the installer on a separate fresh WSA installation and confirm the WSA Settings toggle is ON after installation. CI run #187 proves build/static validation only, not the live first-install result.
