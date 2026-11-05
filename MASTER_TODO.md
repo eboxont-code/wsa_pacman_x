@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Validate the restored WSA Developer mode installer implementation** — runtime installer was restored from clean baseline and both helpers were reinserted using callback-based replacements. CI run #184 is validating the clean script, C# helper, and full Windows package. Do not change existing WSA data or either Grass installation.
+- ⏳ **Fresh-install runtime verification of automatic WSA Developer mode** — installer code, PowerShell parsing, embedded C# registry-helper compilation, Windows application build, portable package, and installer build all passed CI run #187. A fresh WSA installation is required to exercise the `settings.dat` change. Do not modify the user's existing WSA installation or either Grass application.
 
 ## Project goal
 
@@ -771,7 +771,8 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Automatic enablement failure is non-fatal to WSA registration; it reports a manual WSA Settings fallback. It does not change Windows OS Developer Mode and never touches the separate Windows Grass application.
 - ✅ Updated README to explain fresh-install-only behaviour, backup, manual fallback, ADB exposure, and the remaining Android ADB authorization prompt.
 - ✅ Updated Windows CI checks to require the helper functions, ensure the call follows successful fresh registration, reject Windows `AppModelUnlock` changes, and compile the embedded C# raw-registry helper.
-- 🔄 Windows CI run #177 (run ID `41952560140`) is in progress for commit `c9c4d96a3ce5b704955d6231b50efe8e59c09f28`. Await the result before declaring static/build validation complete.
+- ❌ Initial validation runs #177–#185 exposed source insertion and static guard errors; see the detailed repair log below.
+- ✅ Final validation/build run #187 (run ID `41953859094`) passed for PR head `025e65cd0506856db5ab2509943806ceb22b07e9`.
 - ⏳ Real WSA fresh-install behaviour has not been tested. Current registered WSA is an existing installation and is intentionally excluded from modification.
 
 
@@ -801,3 +802,14 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ❌ Run #184 stopped because the static guard expected the phrase `Do not replace the complete hive`, while the source comment split `Do not` and `replace` across two physical lines. This is a test-string mismatch, not a PowerShell syntax or C# compilation failure; the C# compile test had not run yet.
 - ✅ Changed the source comment so `Do not replace the complete hive` appears contiguously. No runtime logic changed.
 - 🔄 Next: rerun Windows CI; confirm the C# registry helper compiles, then full Windows package build completes.
+
+
+### 2026-11-05 — Automatic Developer mode implementation passes CI
+- ✅ Corrected the static guard comment mismatch; the exact phrase `Do not replace the complete hive` now appears in the installer comment on one line.
+- ✅ CI run #186 (run ID `41953848537`, code commit `97d6a6af11b1925b499606e93b8b00eece0e85d2`) passed the WSA PowerShell parser, required function/security checks, and embedded C# registry helper compilation; Windows build and installer steps progressed successfully.
+- ✅ Final PR validation/build run #187 (run ID `41953859094`, PR head `025e65cd0506856db5ab2509943806ceb22b07e9`) completed successfully. Steps passed: Flutter setup, Windows desktop enablement, dependency resolution, WSA runtime PowerShell/static/C# validation, Windows app build, portable package verification, Inno Setup install, Windows installer build, and package upload.
+- ✅ Windows artifact ID: `13381718384`; archive size `53,858,826` bytes; SHA-256 `689734e94b8b86e25fb34d1a293877f33e379a55bb60ea6a709477ff1e0bce30`; expires `2026-11-19T02:16:55Z`.
+- ✅ Current PR #12 remains OPEN and UNMERGED, targets `main`. This change is on `wsa/per-app-tray-icons`.
+- ✅ The implementation changes only fresh WSA installs after successful AppX registration. Existing package early-exit and userdata protection paths remain untouched.
+- ⚠️ CI proves parser/static checks, C# compilation, and Windows package build; it does **not** prove that a fresh WSA installation successfully creates and patches its live `settings.dat` hive.
+- ⏳ Fresh-install runtime test remains outstanding. User's currently installed WSA must not be altered just to test this; test only on a separate clean WSA installation or after an explicit user-authorized clean install with backup.
