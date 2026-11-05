@@ -14,6 +14,7 @@
     "btn_boot": "Turn on",
     "btn_auth": "Reauthenticate",
     "btn_dev_settings": "Developer options",
+    "btn_open_wsa_settings": "Open WSA Settings",
     "btn_switch_on": "On",
     "btn_switch_off": "Off",
 
