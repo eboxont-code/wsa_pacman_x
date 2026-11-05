@@ -289,6 +289,7 @@ jobs:
             "WH_CALLWNDPROC",
             "WH_CALLWNDPROCRET",
             "WsaPacManAppTrayHook.dll",
+            "PostThreadMessageW(thread_id, WM_NULL",
             "NIM_ADD",
             "NIM_DELETE",
             "TaskbarCreated",
@@ -333,8 +334,7 @@ jobs:
             "WS_SYSMENU",
             "HCBT_ACTIVATE",
             "SWP_FRAMECHANGED",
-            "Removed WS_SYSMENU from WSA Android app window",
-            "PostThreadMessageW(thread_id, WM_NULL"
+            "Removed WS_SYSMENU from WSA Android app window"
           )
           foreach ($check in $hookChecks) {
             if ($trayHookSource -notmatch [regex]::Escape($check)) {
