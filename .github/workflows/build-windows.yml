@@ -69,7 +69,9 @@ jobs:
             "Register-WsaResumeTask",
             "Remove-WsaResumeTask",
             "Get-LatestMatchingWsaAsset",
-            "Install-WsaFromFolder"
+            "Install-WsaFromFolder",
+            "Get-WsaSettingsApplicationId",
+            "Enable-WsaDeveloperMode"
           )
           foreach ($functionName in $requiredFunctions) {
             if ($definedFunctions -notcontains $functionName) {
@@ -104,12 +106,26 @@ jobs:
             "TotalPhysicalMemory",
             "DriveFormat",
             "AvailableFreeSpace",
-            "Get-FileHash"
+            "Get-FileHash",
+            "DeveloperModeEnabled",
+            "05F5E10B",
+            "RegSetValueExW",
+            "settings.dat",
+            "pre-dev-mode.",
+            "Enable-WsaDeveloperMode -Package $registeredPackage",
+            "Do not replace the complete hive"
           )
           foreach ($check in $requiredChecks) {
             if ($scriptText -notmatch [regex]::Escape($check)) {
               throw "Required WSA prerequisite/security check is missing: $check"
             }
+          }
+
+          if ($scriptText -match "AppModelUnlock") {
+            throw "WSA Android Developer mode must not be confused with Windows OS Developer Mode"
+          }
+          if ($scriptText -notmatch '(?s)Install-WsaFromFolder -Folder \$installFolder.*?Enable-WsaDeveloperMode -Package \$registeredPackage') {
+            throw "WSA Developer mode must be enabled only after a successful fresh package registration"
           }
 
           if ($scriptText -match "Download, verify, extract and install this matching WSA package now") {
