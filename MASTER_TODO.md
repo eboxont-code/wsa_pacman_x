@@ -187,4 +187,10 @@ Every Android app window running under WSA must behave independently in the Wind
 
 ### 2026-11-05 — WSA client successfully started
 - ✅ User launched `shell:AppsFolder\\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe!App`; PowerShell confirmed `WsaClient.exe` PID `19080` under the installed WSA directory.
-- ⏳ Next: re-check ADB device visibility and, if connected, query installed Android package `io.getgrass.www` and launch logs.
+- ⚠️ Latest bundled-ADB check could not locate a running process named `WSA-pacman`; no ADB command was executed. WSA client itself had previously started successfully (PID `19080`).
+- ⏳ Next: identify the actual PacMan process name/path with a read-only process inventory, then locate its bundled `adb.exe` and retry device discovery.
+
+
+### 2026-11-05 — PacMan process lookup mismatch
+- ⚠️ ADB diagnostic returned `PacMan bundled ADB not found` because `Get-Process -Name WSA-pacman` returned no matching process/path in that snapshot. This is not evidence that ADB or WSA is broken; the ADB command was not run.
+- ⏳ Next: inspect process names and executable paths for WSA/PacMan processes, then locate ADB without modifying any installed applications.
