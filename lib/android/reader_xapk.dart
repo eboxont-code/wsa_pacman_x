@@ -54,9 +54,6 @@ class XapkReader extends IsolateRunner<String, APK_READER_FLAGS> {
   static ManifestXapk _decodeManifest(List<int> bytes) => ManifestXapk.create()
     ..mergeFromProto3Json(utf8.decoder.fuse(json.decoder).convert(bytes));
 
-  static String _shellQuote(String value) =>
-      "'${value.replaceAll("'", "'\\''")}'";
-
   static Future<List<ProcessResult>> copyApkResources(
       List<ManifestXapk_ApkExpansion> expansions,
       String workingDir,
@@ -84,8 +81,8 @@ class XapkReader extends IsolateRunner<String, APK_READER_FLAGS> {
       final remoteSource = '/sdcard/$tempName';
       final remoteDestination = '$resourceDir/$resourceName';
       final moveCommand =
-          'mkdir -p ${_shellQuote(resourceDir)} && '
-          'mv ${_shellQuote(remoteSource)} ${_shellQuote(remoteDestination)}';
+          'mkdir -p ${quoteAdbShellArgument(resourceDir)} && '
+          'mv ${quoteAdbShellArgument(remoteSource)} ${quoteAdbShellArgument(remoteDestination)}';
       final moveResult = await ADBUtils.shellToAddress(
         ipAddress, port, moveCommand,
       ).timeout(const Duration(seconds: 30));
