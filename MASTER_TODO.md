@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Launch-test the installed Android Grass APK and capture runtime errors** — Android boot is complete, package `io.getgrass.www` is installed, and launcher activity `io.getgrass.www/.MainActivity` resolves. Next run an explicit activity launch and inspect logcat. Do not touch the separate Windows Grass desktop app.
+- 🔄 **Reconcile WSA PacMan status with live ADB state** — the user's screenshot shows WSA PacMan v1.5.0 reporting `Arrested / WSA is turned off`, while the earlier terminal output showed ADB device `127.0.0.1:58526` and Android boot status `1`. The explicit Grass `am start` command has **not** been run. Recheck/start WSA through PacMan before launch-testing Grass. Do not touch the separate Windows Grass desktop app.
 
 ## Project goal
 
@@ -273,4 +273,13 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Android package is installed: `pm path io.getgrass.www` returned `package:/data/app/~~-bkncMcgtzCjZphZfapDdw==/io.getgrass.www-zdIBPlk_oKlIZGPGuIzijA==/base.apk`.
 - ✅ Android resolves the launcher activity: `cmd package resolve-activity --brief io.getgrass.www` returned `io.getgrass.www/.MainActivity` (priority 0; not default).
 - ✅ This proves WSA boot, package installation, and activity resolution. It does **not** yet prove Grass opens successfully.
-- 🔄 Current job: start `io.getgrass.www/.MainActivity` explicitly and capture Android runtime errors if it exits or fails to display. Keep the separate Windows Grass app untouched.
+- ⏸️ The explicit `am start` / logcat launch test was offered but has not yet been run by the user; do not treat it as attempted.
+
+
+### 2026-11-05 — PacMan WSA status discrepancy screenshot
+- ✅ User supplied a screenshot of WSA Package Manager v1.5.0. Its WSA tab shows a yellow `Arrested` banner stating `WSA is turned off`, with a `Turn on` button. Android Management actions are visibly disabled in that screen.
+- ✅ The same screenshot shows prior PowerShell output from the earlier diagnostics: ADB listed `127.0.0.1:58526 device`, `sys.boot_completed` returned `1`, `pm path io.getgrass.www` returned an APK path, and activity resolution returned `io.getgrass.www/.MainActivity`.
+- ⚠️ The screenshot does not show the newly supplied `am start -W` launch command or its output. User explicitly clarified they have not run/pasted that new command yet. Grass launch has therefore **not** been tested.
+- ⚠️ PacMan's current UI state (`Arrested / WSA is turned off`) conflicts with the earlier ADB/boot output. The earlier command output may be from a prior moment; take a fresh state reading rather than assume WSA is still online.
+- 🔄 Current task changed from Grass launch testing to reconciling WSA state: use PacMan's visible `Turn on` control, wait for its state to update, then recheck ADB before running any Grass launch command.
+- ✅ Explicitly preserve the user's rule: do not touch the separate Windows Grass desktop application or its installation.
