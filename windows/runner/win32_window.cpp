@@ -308,10 +308,18 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
     wchar_t path[32768] = {};
     const DWORD length = GetModuleFileNameW(nullptr, path,
                                              static_cast<DWORD>(_countof(path)));
-    if (length == 0 || length >= _countof(path)) return;
+    if (length == 0 || length >= _countof(path)) {
+      AppendTrayDiagnostic(L"Could not resolve the WSA PacMan executable path for the app tray hook DLL; retrying in 10 seconds.");
+      wsa_hook_retry_after_[thread_id] = GetTickCount64() + 10000;
+      return;
+    }
     std::wstring dll_path(path, length);
     const size_t slash = dll_path.find_last_of(L"\\/");
-    if (slash == std::wstring::npos) return;
+    if (slash == std::wstring::npos) {
+      AppendTrayDiagnostic(L"Could not resolve the WSA PacMan executable directory for the app tray hook DLL; retrying in 10 seconds.");
+      wsa_hook_retry_after_[thread_id] = GetTickCount64() + 10000;
+      return;
+    }
     dll_path.resize(slash + 1);
     dll_path += L"WsaPacManAppTrayHook.dll";
     app_tray_hook_module_ = LoadLibraryW(dll_path.c_str());
