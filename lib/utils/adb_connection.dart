@@ -132,11 +132,26 @@ WsaAdbEndpoint? findWsaAdbEndpoint(
 
   if (candidates.isEmpty) return null;
 
+  WsaAdbEndpoint? preferred;
   if (preferredSerial != null) {
     for (final candidate in candidates) {
-      if (candidate.serial == preferredSerial) return candidate;
+      if (candidate.serial == preferredSerial) {
+        preferred = candidate;
+        break;
+      }
     }
   }
+
+  // Prefer a responding WSA endpoint over a stale configured endpoint that
+  // is still listed as offline.
+  final responding = candidates
+      .where((candidate) => candidate.state != 'offline' && candidate.state != 'host')
+      .toList();
+  if (preferred != null && preferred.state != 'offline' && preferred.state != 'host') {
+    return preferred;
+  }
+  if (responding.length == 1) return responding.single;
+  if (preferred != null) return preferred;
 
   return candidates.length == 1 ? candidates.single : null;
 }
