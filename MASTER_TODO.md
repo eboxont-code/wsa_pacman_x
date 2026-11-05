@@ -1,6 +1,6 @@
 # WSA PacMan — Master TODO
 
-**Last updated:** 2026-11-04  
+**Last updated:** 2026-11-05  
 **Project repository:** https://github.com/eboxont-code/wsa_pacman_x  
 **Active implementation PR:** https://github.com/eboxont-code/wsa_pacman_x/pull/12
 
@@ -26,7 +26,7 @@
 
 ## Current task
 
-- ⏳ **Restore WSA ADB availability and verify the Android Grass package** — ADB currently lists no connected WSA device, so Android package presence and launch behaviour cannot yet be checked. Keep this separate from the Windows Grass application.
+- 🔄 **Audit and synchronize this master TODO** — reconcile the documented work with all recent WSA/Grass troubleshooting steps, correct stale status/facts, and formalize the rule that every requested project job must be logged here.
 
 ## Project goal
 
