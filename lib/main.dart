@@ -213,6 +213,13 @@ class WSAPeriodicConnector {
     );
 
     if (outcome == AdbConnectOutcome.failed) {
+      GState.adbConnectionDiagnostic.update((_) => describeAdbConnectFailure(
+        endpoint: ADBUtils.deviceName,
+        exitCode: process.exitCode,
+        stdout: stdout,
+        stderr: stderr,
+        timedOut: process.isTimeout,
+      ));
       if (process.isTimeout) {
         log("ADB connection attempt timed out after 3 seconds");
       } else {
@@ -227,8 +234,15 @@ class WSAPeriodicConnector {
               : ConnectionStatus.OFFLINE
           : ConnectionStatus.DISCONNECTED;
     } else if (outcome == AdbConnectOutcome.unauthorized) {
+      GState.adbConnectionDiagnostic.update((_) => describeAdbConnectFailure(
+        endpoint: ADBUtils.deviceName,
+        exitCode: process.exitCode,
+        stdout: stdout,
+        stderr: stderr,
+      ));
       status = ConnectionStatus.UNAUTHORIZED;
     } else {
+      GState.adbConnectionDiagnostic.update((_) => "");
       status = ConnectionStatus.CONNECTED;
     }
   }
