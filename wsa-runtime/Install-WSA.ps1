@@ -501,278 +501,7 @@ function Get-WsaSettingsApplicationId([string]$InstallLocation) {
 
     [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw
     $settingsApplication = $manifest.SelectNodes("//*[local-name()='Application']") |
-        Where-Object { $_.GetAttribute('Executable') -match '(?i)WsaSettings\.exe
-    $runBatch = Get-ChildItem -LiteralPath $Folder -Filter 'Run.bat' -File -Recurse |
-        Select-Object -First 1
-    if ($null -eq $runBatch) {
-        throw "The extracted upstream package did not contain Run.bat. The files have been kept at $Folder for inspection."
-    }
-
-    $workingDirectory = $runBatch.DirectoryName
-    $upstreamScript = Join-Path $workingDirectory 'Install.ps1'
-    if (-not (Test-Path -LiteralPath $upstreamScript -PathType Leaf)) {
-        throw "The extracted package did not contain Install.ps1 beside Run.bat. The files have been kept at $Folder for inspection."
-    }
-
-    Write-Host ''
-    Write-Info 'Registering the WSA Android runtime in the background.'
-    Write-Info 'Running the upstream Install.ps1 directly; its Run.bat launcher opens a separate visible PowerShell window.'
-
-    $sourceText = Get-Content -LiteralPath $upstreamScript -Raw
-    if ($sourceText -notmatch '(?i)Add-AppxPackage\s+-ForceApplicationShutdown\s+-ForceUpdateFromAnyVersion\s+-Register\s+\.\\AppxManifest\.xml') {
-        throw "The upstream Install.ps1 has an unexpected structure. Refusing to patch or run an unrecognized installer. The original file was left untouched."
-    }
-
-    # Create a temporary sibling copy so all upstream relative paths remain valid.
-    # Keep the verified upstream Install.ps1 unchanged.
-    $unattendedScript = Join-Path $workingDirectory 'Install-WSA-PacMan-Unattended.ps1'
-    $logDirectory = Join-Path $env:ProgramData 'WSABuilds\Logs'
-    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
-    $logStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $stdoutLog = Join-Path $logDirectory ("WSA-Upstream-$logStamp.stdout.log")
-    $stderrLog = Join-Path $logDirectory ("WSA-Upstream-$logStamp.stderr.log")
-
-    # Upstream Finish() launches Magisk and Play Store after registering WSA.
-    # This helper selects a NoGApps package, so don't launch unrelated Android apps.
-    $finishPattern = '(?ims)^Function\s+Finish\s*\{.*?^\}'
-    if (-not [regex]::IsMatch($sourceText, $finishPattern)) {
-        throw 'The upstream installer has an unrecognized Finish() function. Refusing to launch unrelated Android apps automatically.'
-    }
-    $finishReplacement = 'Function Finish {' + [Environment]::NewLine +
-        "    Write-Output 'WSA runtime registration completed.'" + [Environment]::NewLine + '}'
-    $finishEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
-        param($match)
-        return $finishReplacement
-    }
-    $sourceText = [regex]::Replace($sourceText, $finishPattern, $finishEvaluator)
-
-    # Upstream prompts for keypresses on completion and error branches. Remove
-    # the waits. An existing-install confirmation gets a null key, i.e. "No".
-    $readKeyPattern = '(?m)(\$[A-Za-z_][A-Za-z0-9_]*\s*=\s*)\$Host\.UI\.RawUI\.ReadKey\(''NoEcho,IncludeKeyDown''\);?'
-    $readKeyMatches = [regex]::Matches($sourceText, $readKeyPattern)
-    if ($readKeyMatches.Count -eq 0) {
-        throw 'The upstream installer no longer contains the expected keypress prompt pattern. Refusing to run an unverified unattended variant.'
-    }
-    $readKeyEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
-        param($match)
-        return $match.Groups[1].Value + '$null'
-    }
-    $sourceText = [regex]::Replace($sourceText, $readKeyPattern, $readKeyEvaluator)
-    if ($sourceText -match '(?i)RawUI\.ReadKey\s*\(') {
-        throw 'The upstream installer contains an unrecognized interactive keypress prompt. Refusing to run it hidden because that could leave setup waiting indefinitely.'
-    }
-
-    # Never let the upstream error-recovery path uninstall an existing package.
-    $preservePattern = '(?ims)^ElseIf\s*\(\s*\$null\s*-Ne\s*\$Installed\s*\)\s*\{.*?^\}'
-    if (-not [regex]::IsMatch($sourceText, $preservePattern)) {
-        throw 'The upstream installer no longer has the expected existing-package recovery path. Refusing an unattended install until that path can be reviewed.'
-    }
-    $preserveReplacement = 'ElseIf ($null -Ne $Installed) {' + [Environment]::NewLine +
-        "    throw 'WSA registration failed while an existing package is present. PacMan will not uninstall or replace it.'" + [Environment]::NewLine + '}'
-    $preserveEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
-        param($match)
-        return $preserveReplacement
-    }
-    $sourceText = [regex]::Replace($sourceText, $preservePattern, $preserveEvaluator)
-
-    # The outer PacMan helper is already elevated. Keep even an unexpected
-    # upstream self-elevation or conhost fallback hidden.
-    $sourceText = $sourceText.Replace(
-        'Start-Process -PassThru -Verb RunAs $pwsh -Args',
-        'Start-Process -PassThru -Verb RunAs -WindowStyle Hidden $pwsh -Args'
-    )
-    $sourceText = $sourceText.Replace(
-        'Start-Process conhost.exe -Args',
-        'Start-Process conhost.exe -WindowStyle Hidden -Args'
-    )
-
-    [System.IO.File]::WriteAllText(
-        $unattendedScript,
-        $sourceText,
-        [System.Text.UTF8Encoding]::new($false)
-    )
-
-    try {
-        $powershell = Join-Path $PSHOME 'powershell.exe'
-        if (-not (Test-Path -LiteralPath $powershell -PathType Leaf)) {
-            throw "Windows PowerShell could not be found at $powershell."
-        }
-
-        $arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $unattendedScript + '"'
-        $process = Start-Process -FilePath $powershell -ArgumentList $arguments -WorkingDirectory $workingDirectory -WindowStyle Hidden -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -Wait -PassThru
-
-        if ($process.ExitCode -ne 0) {
-            $stderrTail = if (Test-Path -LiteralPath $stderrLog) {
-                (Get-Content -LiteralPath $stderrLog -Tail 20 -ErrorAction SilentlyContinue) -join ' '
-            } else { '' }
-            throw "The hidden upstream WSA registration process exited with code $($process.ExitCode). Details: $stderrTail. Logs: $stdoutLog and $stderrLog"
-        }
-    }
-    finally {
-        Remove-Item -LiteralPath $unattendedScript -Force -ErrorAction SilentlyContinue
-    }
-
-    Start-Sleep -Seconds 3
-    $registered = Get-ExistingWsaPackage
-    if ($registered.Count -eq 0) {
-        throw "The upstream installer finished, but Windows did not report a registered WSA package. Logs: $stdoutLog and $stderrLog. The original files were kept at $workingDirectory."
-    }
-
-    Write-Info "Upstream installer output: $stdoutLog"
-    Write-Info "Upstream installer errors: $stderrLog"
-    return $registered
-}
-
-try {
-    Ensure-Administrator
-
-    $logDirectory = Join-Path $env:ProgramData 'WSABuilds\Logs'
-    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
-    $logPath = Join-Path $logDirectory ("Install-WSA-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    try {
-        Start-Transcript -Path $logPath -Force | Out-Null
-        $script:TranscriptStarted = $true
-    }
-    catch {
-        Write-WarningMessage "A diagnostic log could not be started: $($_.Exception.Message)"
-    }
-
-    if ($ResumeAfterRestart) {
-        Remove-WsaResumeTask
-        Write-Info 'Windows sign-in detected after the prerequisite restart; automatically resuming setup.'
-    }
-
-    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-
-    Write-Host ''
-    Write-Info 'Architecture-aware Android runtime setup'
-    Write-Host 'This downloads the current upstream WSABuilds LTS archive directly from GitHub.'
-    Write-Host 'Default package: Android 13, no Google Play Services, no Amazon Appstore.'
-    Write-Host ''
-
-    $target = Get-WindowsTarget
-    Write-Info "Detected Windows target: $($target.OsFamily), native CPU: $($target.Architecture)"
-
-    $existingPackages = Get-ExistingWsaPackage
-    if ($existingPackages.Count -gt 0) {
-        $package = $existingPackages | Select-Object -First 1
-        $installedArchitecture = [string]$package.Architecture
-        Write-Host ''
-        Write-Info "An existing WSA package is already registered: $($package.Name) ($installedArchitecture)."
-        if (($target.Architecture -eq 'arm64' -and $installedArchitecture -match 'Arm64') -or
-            ($target.Architecture -eq 'x64' -and $installedArchitecture -match 'X64')) {
-            Write-Info 'It appears to match this PC. No WSA files or user data were changed.'
-            Write-Host 'Open Windows Subsystem for Android Settings, enable Developer mode, then open WSA PacMan.'
-        }
-        else {
-            Write-WarningMessage 'The registered WSA architecture does not match this PC. No uninstall or replacement was attempted.'
-            Write-Host 'Back up Userdata.vhdx before any manual architecture change:'
-            Write-Host "$env:LOCALAPPDATA\Packages\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe\LocalCache\userdata.vhdx"
-        }
-        exit 0
-    }
-
-    $previousUserData = Join-Path $env:LOCALAPPDATA 'Packages\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe\LocalCache\userdata.vhdx'
-    if (Test-Path -LiteralPath $previousUserData) {
-        Write-WarningMessage 'A previous WSA Userdata.vhdx was found even though no WSA package is currently registered.'
-        Write-Host "Possible Android app data is stored here: $previousUserData"
-        Write-Host 'Copy this file to a safe backup location and move the original out of the WSA package folder before running a fresh install.'
-        Write-Info 'No download, extraction, installation or deletion was performed.'
-        exit 0
-    }
-
-    Confirm-WsaPrerequisites -Target $target
-
-    $computer = Get-CimInstance -ClassName Win32_ComputerSystem
-    $memoryGb = [math]::Round($computer.TotalPhysicalMemory / 1GB, 1)
-    $systemDrive = [IO.Path]::GetPathRoot($env:SystemRoot)
-    $driveInfo = New-Object System.IO.DriveInfo($systemDrive)
-
-    $assetInfo = Get-LatestMatchingWsaAsset -Target $target
-    $release = $assetInfo.Release
-    $asset = $assetInfo.Asset
-    $archiveSizeGb = [math]::Round($asset.size / 1GB, 2)
-
-    Write-Host ''
-    Write-Info "Selected release: $($release.name)"
-    Write-Info "Selected package: $($asset.name)"
-    Write-Info "Compressed download: approximately $archiveSizeGb GB"
-    Write-Info "Free space on $systemDrive $([math]::Round($driveInfo.AvailableFreeSpace / 1GB, 1)) GB"
-    Write-Host ''
-    Write-WarningMessage 'Microsoft ended official WSA support on 5 March 2025. This is an unofficial community build.'
-    Write-WarningMessage 'The selected NoGApps package does not include Google Play Store or Google Play Services.'
-    Write-Host 'The extracted WSA folder must remain on this PC after installation.'
-    Write-Host ''
-
-    Write-Info 'The WSA runtime installation task was selected. Continuing automatically with download, verification, extraction and registration.'
-
-    $root = Join-Path $env:ProgramData 'WSABuilds'
-    $installFolder = Join-Path $root ("WSA-" + $release.tag_name)
-    $downloadsFolder = Join-Path $root 'Downloads'
-    $toolsFolder = Join-Path $root 'Tools'
-    New-Item -ItemType Directory -Path $root, $downloadsFolder, $toolsFolder -Force | Out-Null
-
-    $runBatchAlreadyExtracted = Get-ChildItem -LiteralPath $installFolder -Filter 'Run.bat' -File -Recurse -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    if ($null -eq $runBatchAlreadyExtracted) {
-        if (Test-Path -LiteralPath $installFolder) {
-            $preservedFolder = "$installFolder.incomplete.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-            Move-Item -LiteralPath $installFolder -Destination $preservedFolder -ErrorAction Stop
-            Write-WarningMessage "A previous incomplete extraction was preserved at $preservedFolder."
-        }
-        New-Item -ItemType Directory -Path $installFolder -Force | Out-Null
-    }
-    else {
-        Write-Info 'Found a previously extracted copy of this exact LTS release. It will be reused.'
-    }
-
-    if ($null -eq $runBatchAlreadyExtracted) {
-        $sevenZipPath = Join-Path $toolsFolder '7zr.exe'
-        Get-LatestSevenZipTool -Destination $sevenZipPath
-
-        $archivePath = Join-Path $downloadsFolder $asset.name
-        Invoke-VerifiedDownload -Uri $asset.browser_download_url -Destination $archivePath -Digest $asset.digest -Description $asset.name
-
-        Write-Info 'Extracting the verified WSA archive. This can take several minutes.'
-        & $sevenZipPath x $archivePath "-o$installFolder" -y
-        if ($LASTEXITCODE -ne 0) {
-            throw "7-Zip extraction failed with exit code $LASTEXITCODE. The download and partial files were left for inspection."
-        }
-    }
-
-    $installedPackages = Install-WsaFromFolder -Folder $installFolder
-    $registeredPackage = $installedPackages | Select-Object -First 1
-    $developerModeEnabled = Enable-WsaDeveloperMode -Package $registeredPackage
-    if (-not $developerModeEnabled) {
-        Write-WarningMessage 'WSA installation completed, but Android Developer mode needs manual confirmation in WSA Settings.'
-    }
-    Write-Host ''
-    Write-Info "WSA is registered: $($registeredPackage.Name)"
-    Write-Info "The WSA files are stored at: $installFolder"
-    Write-Info 'The WSA files must remain on this PC. Windows uses them to run WSA.'
-    Write-Host 'Next: WSA is installed. Open WSA PacMan to connect to the Android runtime.'
-
-    if ($archivePath -and (Test-Path -LiteralPath $archivePath)) {
-        Remove-Item -LiteralPath $archivePath -Force
-    }
-    Remove-WsaResumeTask
-    if ($script:TranscriptStarted) {
-        Stop-Transcript | Out-Null
-        $script:TranscriptStarted = $false
-    }
-}
-catch {
-    Write-Host ''
-    Write-WarningMessage $_.Exception.Message
-    Write-Host 'No existing WSA installation was automatically uninstalled or overwritten.'
-    if ($script:TranscriptStarted) {
-        Stop-Transcript | Out-Null
-        Write-Host "Diagnostic log: $logPath"
-        $script:TranscriptStarted = $false
-    }
-    exit 1
-}
- } |
+        Where-Object { $_.GetAttribute('Executable') -match '(?i)WsaSettings\.exe$' } |
         Select-Object -First 1
 
     if ($null -eq $settingsApplication) {
@@ -793,6 +522,7 @@ function Enable-WsaDeveloperMode($Package) {
     # not replace the complete hive with a pre-patched file.
     $settingsPath = $null
     $hiveLoaded = $false
+    $patchSucceeded = $false
     $hiveName = 'WSAPacmanDeveloperMode_' + [guid]::NewGuid().ToString('N')
     $hiveSubKey = $hiveName
     $hiveMount = "HKLM\$hiveName"
@@ -981,7 +711,6 @@ public static class WsaPacmanRawRegistryValue
         # WSA stores DeveloperModeEnabled as a 9-byte custom registry value.
         # Preserve its 8-byte metadata when the value already exists.
         $developerModeValueType = [uint32]0x05F5E10B
-        $patchSucceeded = $false
         $read = [WsaPacmanRawRegistryValue]::Read($hiveSubKey, 'DeveloperModeEnabled')
 
         if ($read.Status -eq 2) {
@@ -1290,6 +1019,10 @@ try {
 
     $installedPackages = Install-WsaFromFolder -Folder $installFolder
     $registeredPackage = $installedPackages | Select-Object -First 1
+    $developerModeEnabled = Enable-WsaDeveloperMode -Package $registeredPackage
+    if (-not $developerModeEnabled) {
+        Write-WarningMessage 'WSA installation completed, but Android Developer mode needs manual confirmation in WSA Settings.'
+    }
     Write-Host ''
     Write-Info "WSA is registered: $($registeredPackage.Name)"
     Write-Info "The WSA files are stored at: $installFolder"
