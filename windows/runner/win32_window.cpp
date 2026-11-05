@@ -383,15 +383,32 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
                   << L"/" << call_wnd_ret_error;
   AppendTrayDiagnostic(hook_diagnostic.str());
 
-  if (!hooks.cbt || !hooks.get_message || !hooks.call_wnd || !hooks.call_wnd_ret) {
+  // CBT close interception and GETMESSAGE tray restoration are the core
+  // behaviours. The CALLWND hooks are an optional WM_CLOSE fallback; a failure
+  // in that fallback must not discard the two hooks that make tray mode work.
+  if (!hooks.cbt || !hooks.get_message) {
     if (hooks.cbt) UnhookWindowsHookEx(hooks.cbt);
     if (hooks.get_message) UnhookWindowsHookEx(hooks.get_message);
     if (hooks.call_wnd) UnhookWindowsHookEx(hooks.call_wnd);
     if (hooks.call_wnd_ret) UnhookWindowsHookEx(hooks.call_wnd_ret);
     wsa_hook_retry_after_[thread_id] = GetTickCount64() + 10000;
-    OutputDebugStringW(L"WSA PacMan: Windows rejected a per-app tray hook; retrying after cooldown.\n");
+    AppendTrayDiagnostic(L"Required per-app hooks (CBT/GETMESSAGE) failed; retrying this WsaClient thread in 10 seconds.");
+    OutputDebugStringW(L"WSA PacMan: required per-app tray hooks were rejected; retrying after cooldown.\n");
     return;
   }
+
+  if (!hooks.call_wnd || !hooks.call_wnd_ret) {
+    if (hooks.call_wnd) {
+      UnhookWindowsHookEx(hooks.call_wnd);
+      hooks.call_wnd = nullptr;
+    }
+    if (hooks.call_wnd_ret) {
+      UnhookWindowsHookEx(hooks.call_wnd_ret);
+      hooks.call_wnd_ret = nullptr;
+    }
+    AppendTrayDiagnostic(L"Optional WM_CLOSE fallback hooks unavailable; CBT/GETMESSAGE tray hooks remain active.");
+  }
+
   wsa_hook_retry_after_.erase(thread_id);
   wsa_thread_hooks_.emplace(thread_id, hooks);
 }
