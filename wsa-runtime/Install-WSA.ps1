@@ -789,7 +789,7 @@ catch {
 
 function Enable-WsaDeveloperMode($Package) {
     # WSA Android Developer mode is stored in this user's settings.dat registry
-    # hive. Do not change Windows OS Developer Mode (AppModelUnlock), and do
+    # hive. Do not change the separate Windows OS Developer Mode setting, and do
     # not replace the complete hive with a pre-patched file.
     $settingsPath = $null
     $hiveLoaded = $false
