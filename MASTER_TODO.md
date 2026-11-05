@@ -200,4 +200,10 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 2026-11-05 — WSA and manager process inventory
 - ✅ User's read-only `Win32_Process` query shows `WsaClient.exe` PID `19080`, `WsaService.exe` PID `5800`, `vmmemWSA` PID `11996`, and `WSACrashUploader.exe` PID `26100`.
 - ⚠️ No WSA PacMan process appeared in the snapshot; the prior process-based ADB lookup could not proceed because its manager executable was not running.
-- ⏳ Next: open WSA PacMan, keep it open, identify its executable path, then locate its bundled ADB and inspect Android connectivity. Preserve the explicit exclusion for the separate Windows Grass application.
+- ✅ User opened WSA PacMan; process inventory confirms `WSA-pacman.exe` PID `28796` at `C:\\Program Files\\WSA PacMan\\WSA-pacman.exe`.
+- ⏳ Next: invoke the bundled ADB at `C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe` and check device connectivity. Preserve the explicit exclusion for the separate Windows Grass application.
+
+
+### 2026-11-05 — WSA PacMan executable located
+- ✅ User's process inventory confirms `WSA-pacman.exe` PID `28796`, executable path `C:\\Program Files\\WSA PacMan\\WSA-pacman.exe`.
+- ⏳ Next: run bundled ADB directly from the manager installation directory and inspect whether WSA exposes an Android device.
