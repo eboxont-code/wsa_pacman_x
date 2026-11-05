@@ -87,7 +87,7 @@ void main() {
       final diagnostic = describeAdbConnectFailure(
         endpoint: 'localhost:58526',
         exitCode: 1,
-        stdout: 'x' * 400,
+        stdout: List<String>.filled(400, 'x').join(),
         stderr: '',
       );
       expect(diagnostic.length, lessThan(300));
