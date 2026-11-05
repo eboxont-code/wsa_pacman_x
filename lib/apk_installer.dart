@@ -14,6 +14,7 @@ import 'package:wsa_pacman/widget/themed_pane_item.dart';
 import 'package:wsa_pacman/windows/win_io.dart';
 import 'package:wsa_pacman/widget/adaptive_icon.dart';
 import 'package:wsa_pacman/widget/flexible_info_bar.dart';
+import 'package:wsa_pacman/widget/fluent_info_bar.dart';
 import 'package:wsa_pacman/widget/move_window_nomax.dart';
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/material.dart' as material;
@@ -71,6 +72,7 @@ class _ApkInstallerState extends State<ApkInstaller> {
   ToggleButtonThemeData? warningButtonTheme;
   bool createShortcut = false;
   bool startingWSA = false;
+  bool _autoLaunchAttempted = false;
   
   @override
   Widget build(BuildContext context) {
@@ -89,11 +91,18 @@ class _ApkInstallerState extends State<ApkInstaller> {
     final mica = GState.mica.of(context);
     final theme = FluentTheme.of(context);
     if (startingWSA && isConnected) startingWSA = false;
-    final autostartWSA = !startingWSA && !isConnected && GState.autostartWSA.of(context);
+    // Opening an APK/XAPK directly must be a complete install flow on a
+    // fresh PacMan install too. Do not make WSA startup depend on the manager's
+    // persisted "Autostart WSA" preference in install mode.
+    final shouldAutoLaunchWSA = !_autoLaunchAttempted && !isConnected &&
+        (Constants.installMode || GState.autostartWSA.of(context));
 
-    if (autostartWSA) {
+    if (shouldAutoLaunchWSA) {
+      _autoLaunchAttempted = true;
       startingWSA = true;
-      if (!WSAUtils.launch()) setState(() {startingWSA = false;});
+      if (!WSAUtils.launch()) {
+        startingWSA = false;
+      }
     }
 
     if (installType == InstallType.DOWNGRADE && warningButtonTheme == null) warningButtonTheme = ToggleButtonThemeData.standard(theme.copyWith(accentColor: Colors.orange));
@@ -156,6 +165,37 @@ class _ApkInstallerState extends State<ApkInstaller> {
             child: SmoothListView(
             //padding: const EdgeInsets.all(5),
             children: [
+              if (!isConnected) Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: FluentInfoBar(
+                  title: Text(connectionStatus.title(lang)),
+                  content: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(connectionStatus.desc(lang)),
+                      if (connectionStatus.type == ConnectionStatus.ARRESTED) ...[
+                        const SizedBox(width: 15.0),
+                        Button(
+                          child: Text(lang.btn_boot),
+                          onPressed: () => WSAUtils.launch(),
+                        ),
+                      ] else if (connectionStatus.type == ConnectionStatus.UNAUTHORIZED) ...[
+                        Button(
+                          child: Text(lang.btn_auth),
+                          onPressed: () => WSAPeriodicConnector.reconnect(),
+                        ),
+                        const SizedBox(width: 8.0),
+                        Button(
+                          child: Text(lang.btn_dev_settings),
+                          onPressed: () => WSAUtils.launchDeveloperSettings(),
+                        ),
+                      ],
+                    ],
+                  ),
+                  isLong: true,
+                  severity: connectionStatus.severity,
+                ),
+              ),
               for (var permission in GState.permissions.of(context)) Container(
                 padding: EdgeInsets.only(right: isLtr ? 10 : 0, left: isLtr ? 0 : 10),
                 child: ThemablePaneItem(
@@ -183,7 +223,7 @@ class _ApkInstallerState extends State<ApkInstaller> {
               )),
               const SizedBox(width: 15),
               noMoveWindow(ToggleButton(
-                child: Text(startingWSA ? lang.installer_btn_starting : installType?.buttonText(lang) ?? lang.installer_btn_loading),
+                child: Text(startingWSA && connectionStatus.type == ConnectionStatus.STARTING ? lang.installer_btn_starting : installType?.buttonText(lang) ?? lang.installer_btn_loading),
                 checked: true,
                 style: installType == InstallType.DOWNGRADE ? warningButtonTheme : null,
                 onChanged: !canInstall ? null : (_){
