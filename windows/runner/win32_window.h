@@ -65,7 +65,7 @@ class Win32Window {
   HMODULE app_tray_hook_module_ = nullptr;
   std::wstring wsa_client_executable_path_;
   std::unordered_map<DWORD, WsaThreadHooks> wsa_thread_hooks_;
-  std::unordered_set<DWORD> failed_wsa_hook_threads_;
+  std::unordered_map<DWORD, ULONGLONG> wsa_hook_retry_after_;
   std::unordered_set<HWND> diagnosed_windows_;
 
   std::wstring ResolveWsaClientExecutablePath();
