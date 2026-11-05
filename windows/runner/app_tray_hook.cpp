@@ -93,6 +93,49 @@ bool IsWsaClientWindow(HWND window) {
   return is_wsa_client;
 }
 
+// Remove the native system-menu style from each WSA Android app window.
+// Windows does not expose a supported way to remove only the X while keeping
+// the standard Minimize/Maximize buttons: those controls are part of the same
+// WS_SYSMENU caption feature. This intentionally removes the complete system
+// menu and its caption buttons from WSA app windows only.
+bool RemoveAppCloseControl(HWND window) {
+  if (!IsWsaClientWindow(window)) return false;
+
+  SetLastError(ERROR_SUCCESS);
+  const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
+  if (style == 0 && GetLastError() != ERROR_SUCCESS) {
+    AppendHookDiagnostic(L"Could not read WSA app window styles.");
+    return false;
+  }
+
+  if ((style & WS_SYSMENU) == 0) return true;
+
+  SetLastError(ERROR_SUCCESS);
+  const LONG_PTR previous =
+      SetWindowLongPtrW(window, GWL_STYLE, style & ~static_cast<LONG_PTR>(WS_SYSMENU));
+  if (previous == 0 && GetLastError() != ERROR_SUCCESS) {
+    const DWORD error = GetLastError();
+    wchar_t diagnostic[192] = {};
+    swprintf_s(diagnostic, L"Could not remove WS_SYSMENU from WSA app window; error=%lu.", error);
+    AppendHookDiagnostic(diagnostic);
+    return false;
+  }
+
+  if (!SetWindowPos(window, nullptr, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                    SWP_NOACTIVATE | SWP_FRAMECHANGED)) {
+    const DWORD error = GetLastError();
+    wchar_t diagnostic[192] = {};
+    swprintf_s(diagnostic, L"WSA app frame refresh failed after removing X; error=%lu.", error);
+    AppendHookDiagnostic(diagnostic);
+    return false;
+  }
+
+  AppendHookDiagnostic(L"Removed WS_SYSMENU from WSA Android app window; X, Minimize, Maximize and system menu are hidden.");
+  return true;
+}
+
+
 void DeleteTrayIcon(HWND window) {
   NOTIFYICONDATAW data{};
   data.cbSize = sizeof(data);
@@ -205,7 +248,9 @@ bool IsClosePending(HWND window) {
 extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCbtProc(
     int code, WPARAM wparam, LPARAM lparam) {
   LogHookExecutionOnce(L"WH_CBT");
-  if (code == HCBT_SYSCOMMAND) {
+  if (code == HCBT_ACTIVATE) {
+    RemoveAppCloseControl(reinterpret_cast<HWND>(wparam));
+  } else if (code == HCBT_SYSCOMMAND) {
     // For HCBT_SYSCOMMAND, wParam is the SC_* command, not an HWND.
     // This CBT hook is thread-specific, so GetActiveWindow returns the
     // WSA app window receiving the close command on this thread.
@@ -236,6 +281,11 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayGetMessageProc(
   LogHookExecutionOnce(L"WH_GETMESSAGE");
   if (code >= 0 && wparam == PM_REMOVE && lparam != 0) {
     auto message = reinterpret_cast<MSG*>(lparam);
+
+    // The first queued message after hook installation also updates an
+    // already-open Android window, even when it is already active.
+    HWND candidate = message->hwnd != nullptr ? message->hwnd : GetActiveWindow();
+    if (candidate != nullptr) RemoveAppCloseControl(candidate);
 
     if (message->message == kWsaAppTrayCallbackMessage &&
         message->wParam == kWsaAppTrayIconId &&
