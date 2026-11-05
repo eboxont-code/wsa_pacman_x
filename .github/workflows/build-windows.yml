@@ -280,6 +280,8 @@ jobs:
             "InstallWsaAppHooks",
             "RemoveWsaAppHooks",
             "SetWindowsHookExW",
+            "if (!hooks.cbt || !hooks.get_message)",
+            "Optional WM_CLOSE fallback hooks unavailable",
             "wsa_hook_retry_after_",
             "GetTickCount64() + 10000",
             "WH_CBT",
