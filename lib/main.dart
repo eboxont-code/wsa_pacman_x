@@ -132,7 +132,8 @@ class WSAPeriodicConnector {
     }
   }
 
-  static Future<void> _checkConnectionStatusOnce() async {    if (_statusInitialized) {
+  static Future<void> _checkConnectionStatusOnce() async {
+    if (_statusInitialized) {
       Process.run('${Env.SYSTEM_ROOT}\\System32\\tasklist.exe', []).then((result){
         if (!result.stdout.toString().contains(RegExp(r'(^|\n)adb.exe\s+'))) {
           status = ConnectionStatus.UNKNOWN;
