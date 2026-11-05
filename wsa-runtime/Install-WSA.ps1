@@ -524,7 +524,7 @@ function Enable-WsaDeveloperMode($Package) {
     $hiveLoaded = $false
     $patchSucceeded = $false
     $hiveName = 'WSAPacmanDeveloperMode_' + [guid]::NewGuid().ToString('N')
-    $hiveSubKey = $hiveName
+    $hiveSubKey = "$hiveName\LocalState"
     $hiveMount = "HKLM\$hiveName"
     $regExe = Join-Path $env:SystemRoot 'System32\reg.exe'
 
