@@ -31,3 +31,7 @@ void requireAdbCommandSuccess({
 
   throw AdbCommandFailure(operation, exitCode, output);
 }
+
+/// Quotes one argument for the Android device's POSIX shell.
+String quoteAdbShellArgument(String value) =>
+    "'${value.replaceAll("'", "'\\''")}'";
