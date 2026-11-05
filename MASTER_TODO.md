@@ -31,7 +31,7 @@
 
 ## Current task
 
-- ⏳ **Runtime verification of each Android app's X-to-tray behavior** — the user clarified that the X requirement applies to every WSA-hosted Android app window, not the WSA PacMan manager. A diagnostic portable build from PR #12 is ready. Await a real WSA test and `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` to verify WsaClient window discovery, hook registration/injection, close interception, per-window NIM_ADD, and isolated restore.
+- 🔄 **Strengthen per-Android-app close interception** — user tested the diagnostic build and reports that no app tray icon is created. Add a queued-message fallback for `WM_CLOSE` and `SC_CLOSE` in the injected WSA app-thread hook, with diagnostics and CI source guards. Keep PacMan manager behavior unchanged; then rebuild an EXE installer and portable package.
 
 ## Project goal
 
@@ -906,6 +906,11 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Inspected outer artifact listing; it contains exactly the portable package and Windows installer.
 - ✅ Branch includes only the TODO documentation commit after tested source head `c01fb3f5be1c4122341421c33280eb07b5f3a121`; no source code changed after the run #206 build.
 - ⏳ Next: use the test installer/package and inspect `%TEMP%\\WsaPacMan-AppTray-Diagnostics.log` on the WSA machine. Look for matched WsaClient HWND/PID/TID, each hook registration status, `Hook DLL executed inside process`, and `Per-app notification icon successfully added` or a specific failure. Runtime behaviour is still unverified.
+-
+### 2026-11-05 — Second per-app tray interception attempt
+- 🔄 User reports latest per-app tray build still creates no system tray icon when closing Android apps.
+- 🔄 Next implementation: intercept queued `WM_CLOSE` and queued `WM_SYSCOMMAND/SC_CLOSE` in `WH_GETMESSAGE` before WSA processes the close; on successful per-app tray icon creation, replace the queued close message with `WM_NULL` so only that app window is hidden.
+- ⏳ Preserve the existing CBT and sent-message fallback paths; log each queued-close attempt and `NIM_ADD` outcome. Run Windows CI and produce the EXE installer, not only the portable ZIP.
 
 ### 2026-11-05 — User clarified the per-app Android X requirement
 - ✅ User clarified that clicking X on **each installed/running Android app** must hide only that app window into its own notification-area tray icon; this is not a request to change WSA PacMan's own close button.
