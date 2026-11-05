@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-11-05  
 **Project repository:** https://github.com/eboxont-code/wsa_pacman_x  
-**Active implementation PR:** https://github.com/eboxont-code/wsa_pacman_x/pull/12
+**Archived implementation PR:** https://github.com/eboxont-code/wsa_pacman_x/pull/12 (closed as not planned)
 
 ## Working rules
 
@@ -28,21 +28,15 @@
 - ⬜ **NOT STARTED** — not yet begun
 - ❌ **BLOCKED** — cannot proceed; reason must be recorded
 - ❌ **FAILED** — a test was performed and the expected behaviour did not occur
+- 🚫 **CANCELLED** — the user explicitly stopped pursuing the task
 
 ## Current task
 
-- ⏳ **Live verification of the per-app no-X build** — Windows CI run #262 passed and the EXE installer is extracted and checksum-verified. Need the user to confirm the X is removed from WSA Android app windows, that their windows remain usable, and that PacMan itself is unchanged.
+- 🚫 **Per-app Android tray / no-X feature — CANCELLED at the user's request.** The user tested the latest no-X installer and reported that it did not work. Do not continue, rebuild, or merge this feature unless the user explicitly reopens the task.
 
 ## Project goal
 
-Every Android app window running under WSA must behave independently in the Windows notification area:
-
-- Closing an app window hides only that app window; it must not close the Android activity or other apps.
-- Each hidden app has its own tray icon, using the app's own identity where available.
-- Clicking one app's tray icon restores only that app.
-- Other Android apps remain unaffected.
-- YouTube Music (and other apps) should continue background activity/audio while hidden.
-- WSA PacMan's own controls and tray behaviour remain separate from individual Android app windows.
+The per-app Android tray / no-X feature has been cancelled at the user's request. It is no longer an active project goal.
 
 ## Master checklist
 
@@ -62,7 +56,7 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ Add CI regression checks for the hook and package contents.
 - ✅ Added executable-name fallback for `WsaClient.exe`, so versioned or unresolved WindowsApps paths no longer stop discovery.
 - ✅ Added a runtime diagnostics log for visible top-level windows, hook installation results, close-hook events, and per-app `Shell_NotifyIconW(NIM_ADD)` results.
-- ⏳ Actual runtime hook attachment and per-app tray behaviour remain unverified; the diagnostic build is ready for user testing.
+- ❌ User tested the no-X installer and reported that it did not work. The per-app tray / no-X feature is cancelled.
 
 ### 3. Build and packaging
 
@@ -93,43 +87,19 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ Source review confirms PacMan's Manage apps button launches Android's `ManageApplicationsActivity`; it does not implement Windows uninstall-registry cleanup.
 - ✅ Microsoft's WSA help identifies WSA Settings > Apps as the list of installed Android apps. WSA community docs report stale per-app uninstall entries can remain under HKCU Uninstall after normal Android uninstall.
 - ✅ Reviewed diagnostic-only code changes and confirmed CI #141 compiled and packaged successfully; this does not prove the installed app starts correctly.
-- ⬜ Launch YouTube (or another WSA Android app), click that app window's X, and check whether its own icon appears.
-- ⬜ Share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` so we can identify whether discovery, hook registration, close interception, or icon creation is failing.
-- ⬜ Re-test all app behaviours after the underlying runtime issue is fixed.
-- ⬜ Open YouTube and YouTube Music together and capture diagnostic output for both WsaClient windows.
-- ⬜ Click YouTube's X — only YouTube hides.
-- ⬜ Confirm YouTube has its own notification-area tray icon (including under the `^` overflow if Windows places it there).
-- ⬜ Click YouTube's tray icon — only YouTube restores.
-- ⬜ Confirm YouTube Music continues playing while YouTube is hidden.
-- ⬜ Repeat the hide/restore test with WhatsApp.
-- ⬜ Test multiple Android apps hidden at the same time; confirm each icon restores the correct app.
-- ⬜ Check minimize/restore interactions.
-- ⬜ Exit WSA PacMan and confirm no app window is left unintentionally hidden.
-- ⬜ Check for crashes, duplicate/stale tray icons, or stuck windows.
+- 🚫 CANCELLED — all remaining live WSA per-app tray / no-X checks below were dropped at the user's request.
 
 ### 5. Fix, retest, and release
 
-- ⬜ Diagnose and fix any real-device test failures.
-- ⬜ Rebuild and rerun CI after code changes.
-- ⬜ Repeat every relevant real-device test after fixes.
-- ⬜ Confirm the final tested commit and package contents.
-- ⬜ Merge PR #12 only after the required runtime tests pass.
-- ⬜ Build the final release from the merged `main` branch.
-- ⬜ Verify the final installer and portable package.
-- ⬜ Publish final download links and SHA-256 checksums.
-- ⬜ Record the released version, commit, build run, and known limitations.
+- 🚫 CANCELLED — no further fixes, builds, runtime tests, merge, or release work will be done for the per-app tray / no-X feature unless the user asks to reopen it.
 
 ## Current verified facts
 
-- PR #12 is open and targets `main`.
-- PR branch: `wsa/per-app-tray-icons`.
-- Current PR head before final TODO synchronization: `535e7df83a4ae0af3357bae55c81d3534f00a89c` (the final documentation commit advances the branch again).
-- Latest CI run: [#141](https://github.com/eboxont-code/wsa_pacman_x/actions/runs/41826799475), successful.
-- Diagnostic artifact ID: `13319523119`; expires 2026-11-18.
-- Diagnostic installer SHA-256: `47f63ec128666462bcbe67483338eb0841d552911cc21f54bace13386d49f0e2`.
-- Diagnostic artifact ZIP SHA-256: `84b0adcced9346deee96644fdcea06a0fc6ffec13388d14abb4a3c915bb6847d`.
-- CI success confirms build/package validation; **it does not prove runtime behaviour on the user's WSA installation**.
-- PR #12 has not been merged.
+- PR #12 is closed with reason `not_planned`; it was not merged.
+- Branch `wsa/per-app-tray-icons` is retained for history and has not been deleted.
+- The user tested the latest no-X installer and reported that it did not work.
+- Windows CI run #262 passed build/package checks, but that did not establish live WSA runtime behaviour.
+- The per-app Android tray / no-X task is cancelled; do not resume without an explicit request.
 
 
 ## WSA / Android Grass troubleshooting — current evidence
@@ -947,3 +917,10 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ GitHub artifact ID `13411355766`; outer ZIP SHA-256 `4cf3edca5bbdd331d2aff8daa550965d6b7c2798f75520c0c86d0b671900d0c9`; artifact expires `2026-11-19T11:33:00Z`.
 - ✅ Extracted Windows installer EXE `WSA-PacMan-no-X-v1.5.0-setup.exe` (37,104,568 bytes); SHA-256 `719a8cc5898ceffe5c90928bcfea563c2e49ed119eac82144e54bf6110f0a78c`.
 - ⏳ Live WSA desktop test remains required. Confirm X removed only from Android app windows, explain expected loss of standard Minimize/Maximize/system menu, verify app remains open, and confirm PacMan manager unaffected.
+
+
+### 2026-11-05 — User cancelled per-app Android tray / no-X task
+- 🚫 User tested the latest no-X installer and reported that it did not work.
+- 🚫 User instructed that the task be deleted/cancelled; no further implementation or runtime troubleshooting is authorized unless requested again.
+- ✅ Closed PR #12 as `not_planned`; it remains unmerged.
+- ✅ Retained the PR branch and commit history; no source files or other projects were deleted.
