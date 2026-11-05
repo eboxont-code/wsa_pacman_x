@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Validate the LocalState registry-key correction in CI** — `wsa-runtime/Install-WSA.ps1` now targets `$hiveName\LocalState`, and Windows workflow static checks require the exact assignment. Confirm the new CI run passes before calling the code change validated. Fresh-install runtime test remains separate and outstanding.
+- ⏳ **Fresh-install runtime verification of automatic WSA Android Developer mode** — corrected installer code and CI run #196 passed, including a disposable Windows registry write/read test and full Windows package build. The only unverified step is observing the WSA Developer mode toggle after a genuinely fresh WSA install. Do not modify the user's existing WSA installation.
 
 ## Project goal
 
@@ -836,4 +836,21 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ All existing backup, schema validation, single-byte update, metadata preservation, read-back verification, and fresh-install-only safeguards remain unchanged.
 - ✅ Updated `.github/workflows/build-windows.yml` to require the exact `$hiveSubKey = "$hiveName\LocalState"` source assignment in the runtime checks. This closes the gap that let the earlier root-key implementation pass static validation.
 - ✅ Source evidence: the WSA-specific reference adds `DeveloperModeEnabled` beneath `HKLM\WSA\LocalState`; the settings.dat structure reference confirms `LocalState` is a subkey in the package settings hive and explains custom Boolean type `0x05F5E10B` uses 1 byte of value plus 8 bytes of timestamp metadata.
-- ⏳ Awaiting Windows CI for the corrected commit. A fresh WSA runtime installation is still required to prove the setting is reflected in the WSA UI; do not modify the user's existing WSA installation.
+- ✅ Windows CI run #193 (run ID `41956057271`) completed successfully after the LocalState target correction.
+- ✅ Windows CI run #194 (run ID `41956264540`) completed successfully with the disposable registry-helper test; all WSA validation, Windows app build, portable packaging, and installer steps passed.
+- ✅ Final Windows CI run #196 (run ID `41956388049`, code commit `4f9d0db57b27db8d9c89ce59bb0509218b0d4787`) completed successfully, including the explicit `LocalState` creation guard, Windows app build, portable package verification, Inno Setup installer build, and artifact upload.
+- ✅ Final Windows artifact: ID `13383916487`; archive size `53,863,148` bytes; SHA-256 `63633ed0e69faab513c421a2af6cad5f172c27929570bdb79bb561983a907f2c`; expires `2026-11-19T02:42:03Z`.
+- ⚠️ CI verifies the registry helper against a disposable HKLM test key and validates the full package. It still cannot prove a fresh WSA installation's UI toggle without a genuine fresh WSA runtime test.
+- ⏳ Fresh WSA runtime verification remains outstanding. Do not modify the user's existing WSA installation; test only in a separate clean WSA environment or after explicit authorization and a full backup.
+
+
+### 2026-11-05 — Automatic Developer mode registry target corrected and CI passed
+- ✅ Root cause found in the earlier implementation: `Enable-WsaDeveloperMode` pointed raw registry reads/writes at the mounted `settings.dat` hive root. The WSA-specific registry example stores `DeveloperModeEnabled` under `LocalState`; independent settings.dat structure research also confirms `LocalState` is a child key.
+- ✅ Corrected `$hiveSubKey` to `"$hiveName\\LocalState"`.
+- ✅ Added a safe `reg.exe add "$hiveMount\\LocalState" /f` operation after loading the hive. It creates/opens only the `LocalState` key, checks the exit code, and does not clear or replace other settings.
+- ✅ Added a Windows CI regression guard requiring the exact LocalState target and key-creation command.
+- ✅ Added an executable CI test for the embedded C# raw registry helper using a disposable HKLM test key: write/read the custom type `0x05F5E10B` with a 9-byte Boolean payload; change only byte 0 from disabled to enabled; verify bytes 1–8 (FILETIME metadata) are unchanged; verify the root key has no `DeveloperModeEnabled` value.
+- ✅ CI run #194 (run ID `41956264540`) passed the registry-helper fixture and full Windows application/package/installer build.
+- ✅ Final CI run #196 (run ID `41956388049`, commit `4f9d0db57b27db8d9c89ce59bb0509218b0d4787`) passed all steps. Final artifact ID `13383916487`, SHA-256 `63633ed0e69faab513c421a2af6cad5f172c27929570bdb79bb561983a907f2c`.
+- ✅ PR #12 remains OPEN and UNMERGED on `wsa/per-app-tray-icons`.
+- ⚠️ This is now build- and registry-helper-tested, but not yet runtime-verified against a genuinely fresh WSA installation. Existing WSA installation remains untouched.
