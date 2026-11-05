@@ -65,19 +65,32 @@ bool IsWsaClientWindow(HWND window) {
       (GetWindowLongPtrW(window, GWL_STYLE) & WS_CHILD) != 0) return false;
 
   DWORD pid = 0;
-  if (GetWindowThreadProcessId(window, &pid) == 0 || pid == 0) return false;
-  HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-  if (process == nullptr) return false;
+  if (GetWindowThreadProcessId(window, &pid) == 0 ||
+      pid == 0 || pid != GetCurrentProcessId()) {
+    AppendHookDiagnostic(L"Window rejected: HWND does not belong to the injected WsaClient process.");
+    return false;
+  }
 
+  // This DLL is injected only into WsaClient.exe UI threads. Resolve the
+  // current process image directly instead of reopening our own AppX process;
+  // OpenProcess can be denied by package/process restrictions even though the
+  // thread-specific hook itself was installed successfully.
   wchar_t path[32768] = {};
-  DWORD length = static_cast<DWORD>(_countof(path));
-  const BOOL queried = QueryFullProcessImageNameW(process, 0, path, &length);
-  CloseHandle(process);
-  if (!queried || length == 0) return false;
+  const DWORD length = GetModuleFileNameW(nullptr, path,
+                                           static_cast<DWORD>(_countof(path)));
+  if (length == 0 || length >= _countof(path)) {
+    AppendHookDiagnostic(L"Window rejected: could not resolve injected process image path.");
+    return false;
+  }
 
   const wchar_t* name = wcsrchr(path, L'\\');
   name = name == nullptr ? path : name + 1;
-  return CompareStringOrdinal(name, -1, L"WsaClient.exe", -1, TRUE) == CSTR_EQUAL;
+  const bool is_wsa_client =
+      CompareStringOrdinal(name, -1, L"WsaClient.exe", -1, TRUE) == CSTR_EQUAL;
+  if (!is_wsa_client) {
+    AppendHookDiagnostic(L"Window rejected: injected process image is not WsaClient.exe.");
+  }
+  return is_wsa_client;
 }
 
 void DeleteTrayIcon(HWND window) {
@@ -137,7 +150,12 @@ bool HideWindowToTray(HWND window) {
   wcsncpy_s(data.szTip, title, _TRUNCATE);
 
   if (!Shell_NotifyIconW(NIM_ADD, &data)) {
-    AppendHookDiagnostic(L"Shell_NotifyIconW(NIM_ADD) failed for an Android app window.");
+    const DWORD error = GetLastError();
+    wchar_t diagnostic[256] = {};
+    swprintf_s(diagnostic,
+               L"Shell_NotifyIconW(NIM_ADD) failed for HWND=%p; Win32 error=%lu.",
+               window, error);
+    AppendHookDiagnostic(diagnostic);
     if (saved.owns_icon && saved.icon != nullptr) DestroyIcon(saved.icon);
     return false;
   }
@@ -218,6 +236,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayGetMessageProc(
   LogHookExecutionOnce(L"WH_GETMESSAGE");
   if (code >= 0 && wparam == PM_REMOVE && lparam != 0) {
     auto message = reinterpret_cast<MSG*>(lparam);
+
     if (message->message == kWsaAppTrayCallbackMessage &&
         message->wParam == kWsaAppTrayIconId &&
         (message->lParam == WM_LBUTTONUP ||
@@ -225,6 +244,32 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayGetMessageProc(
          message->lParam == WM_RBUTTONUP)) {
       RestoreWindowFromTray(message->hwnd);
       message->message = WM_NULL;
+      message->wParam = 0;
+      message->lParam = 0;
+    }
+
+    // Some WSA window frameworks post WM_CLOSE (or queue SC_CLOSE) rather
+    // than passing the X action through DefWindowProc's CBT system-command
+    // path. Intercept those queued messages before WsaClient dispatches them.
+    const bool queued_close =
+        message->message == WM_CLOSE ||
+        (message->message == WM_SYSCOMMAND &&
+         (static_cast<UINT>(message->wParam) & 0xFFF0) == SC_CLOSE);
+    if (queued_close && message->hwnd != nullptr) {
+      AppendHookDiagnostic(
+          message->message == WM_CLOSE
+              ? L"WH_GETMESSAGE received queued WM_CLOSE for a WSA app window."
+              : L"WH_GETMESSAGE received queued SC_CLOSE for a WSA app window.");
+      if (HideWindowToTray(message->hwnd)) {
+        message->message = WM_NULL;
+        message->wParam = 0;
+        message->lParam = 0;
+        AppendHookDiagnostic(
+            L"Queued Android app close intercepted; close message replaced with WM_NULL.");
+      } else {
+        AppendHookDiagnostic(
+            L"Queued Android app close could not be converted to a tray hide; original close message will continue.");
+      }
     }
   }
   return CallNextHookEx(nullptr, code, wparam, lparam);
