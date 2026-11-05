@@ -117,7 +117,7 @@ class XapkReader extends IsolateRunner<String, APK_READER_FLAGS> {
       await resources;
     } catch (error, stackTrace) {
       resourceCopyError = error.toString();
-      log("XAPK expansion resource copy failed: $error\\n$stackTrace");
+      log("XAPK expansion resource copy failed: $error\n$stackTrace");
     }
 
     if (!result.isTimeout) Directory(workingDir).deleteSync(recursive: true);
@@ -130,11 +130,11 @@ class XapkReader extends IsolateRunner<String, APK_READER_FLAGS> {
     } else if (result.isTimeout) {
       GState.apkInstallState.update((_) => InstallState.TIMEOUT);
       GState.errorCode.update((_) => "TIMEOUT");
-      GState.errorDesc.update((_) => '${lang.installer_error_timeout}\\n\\n${lang.installer_warning_dirty(workingDir)}');
+      GState.errorDesc.update((_) => '${lang.installer_error_timeout}\n\n${lang.installer_warning_dirty(workingDir)}');
     } else if (result.exitCode != 0) {
       GState.apkInstallState.update((_) => InstallState.ERROR);
       //TODO add cause
-      RegExpMatch? errorMatch = RegExp(r'(^|\\n)\\s*adb:\\s+failed\\s+to\\s+install\\s+.*:\\s+Failure\\s+\\[([^:]*):\\s*([^\\s].*[^\\s])\\s*\\]').firstMatch(error);
+      RegExpMatch? errorMatch = RegExp(r'(^|\n)\s*adb:\s+failed\s+to\s+install\s+.*:\s+Failure\s+\[([^:]*):\s*([^\s].*[^\s])\s*\]').firstMatch(error);
       String errorCode = errorMatch?.group(2) ?? "";
       GState.errorCode.update((_) => errorCode.isNotEmpty ? errorCode : "UNKNOWN_ERROR");
       String errorDesc = errorMatch?.group(3) ?? "";
