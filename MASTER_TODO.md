@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Identify why WSA has no ADB listener/transport despite active processes** — latest snapshot: `WsaClient.exe` PID `24272`, `WsaService.exe` PID `25188`, `vmmemWSA` PID `25320`, `WSACrashUploader.exe` PID `26100`, and `WSA-pacman.exe` PID `28796`; no TCP connections were returned for those process IDs. Check all high listening ports and the untruncated WSA client command line. Do not launch Grass until ADB reconnects; do not touch the separate Windows Grass desktop app.
+- 🔄 **Check WSA Developer mode and wake the Android subsystem** — latest client command line includes `/partiallyrunning`; Microsoft documents Partially running as a low-resource subsystem mode, so this flag alone is not a failure. WSA processes are alive but ADB has no attached device. Open WSA Settings, verify Developer mode, and use the Files action to bring the subsystem up before reconnecting ADB. Do not launch Grass until a device is connected. Do not touch the separate Windows Grass desktop app.
 
 ## Project goal
 
@@ -324,3 +324,13 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ `Get-NetTCPConnection` filtered to these WSA/PacMan process IDs returned no rows.
 - ⚠️ Empty process-owned socket output does not establish that no WSA endpoint exists; the endpoint may be owned by another Windows process or may not be listening.
 - 🔄 Next: enumerate listening high TCP ports and print full WSA client/service command lines to identify any current ADB endpoint or startup mode.
+
+
+### 2026-11-05 — WSA partial-running mode and high-port scan
+- ✅ User supplied the high-port TCP inventory and complete WSA command lines.
+- ✅ WSA client command line is `"C:\\ProgramData\\WSABuilds\\WSA-Windows_11_2407.40000.4.0_LTS_8\\WSA_2407.40000.4.0_x64\\WsaClient\\WsaClient.exe" /partiallyrunning`.
+- ✅ Current WSA process IDs in that output: `WsaClient.exe` 24272, `WsaService.exe` 25188, `vmmemWSA` 25320, `WSACrashUploader.exe` 26100; PacMan PID 28796.
+- ✅ High-port scan found no listed WSA-process-owned listener. Several high ports were bound by other PIDs; a loopback listener on 127.0.0.1:57866 belongs to PID 11080, not yet identified. Do not mistake unrelated ports for WSA ADB.
+- ✅ ADB server remains a separate listener on 127.0.0.1:5037 (PID 4140) from the immediately preceding diagnostic; it does not mean an Android device is attached.
+- ℹ️ Microsoft Support documents the WSA **Partially running** memory/performance mode as retaining minimal resources while allowing apps to start faster than **As needed**. Therefore, the `/partiallyrunning` argument is consistent with a documented WSA operating mode and is not, by itself, evidence of a crash or fault. Source: https://support.microsoft.com/en-us/windows/apps/mobileapps/manage-settings-for-mobile-apps-on-windows
+- 🔄 Next: open the registered WSA Settings app (`SettingsApp`), inspect Advanced settings > Developer mode, and use the Files action to wake the subsystem. Then run `adb devices` and use the current developer-settings endpoint rather than assuming port 58526.
