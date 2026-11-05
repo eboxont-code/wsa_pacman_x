@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Implement first-install WSA Developer mode enablement in the runtime installer** — patch only the current user's WSA `settings.dat` value `DeveloperModeEnabled` after a fresh AppX registration. Preserve the complete hive and all other values; use a backup and strict format checks. Existing WSA installations must remain untouched. Do not confuse WSA Android Developer mode with Windows OS Developer Mode.
+- 🔄 **Validate the fresh-install WSA Developer mode implementation** — code and documentation are committed. Windows CI is checking PowerShell parsing, native registry-helper compilation, fresh-install-only ordering, and the Windows build. WSA runtime mutation still needs a fresh-install test; do not alter the user's existing WSA or either Grass installation.
 
 ## Project goal
 
@@ -367,3 +367,16 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ⚠️ Rejected the alternative of copying another project's complete pre-patched `settings.dat` over the user's hive: that would replace unrelated WSA settings. The implementation will instead load the fresh-install hive and change only the first byte of the existing `DeveloperModeEnabled` value, preserving its original type and remaining bytes.
 - ✅ Distinguished WSA Android Developer mode from Windows OS Developer Mode. No Windows AppModelUnlock registry settings will be changed.
 - 🔄 Implementation plan: after fresh WSA package registration, initialize the per-user settings hive if needed, close only the WSA Settings process for this package, back up `settings.dat`, update only `DeveloperModeEnabled` through Windows registry APIs while the hive is mounted, verify the value, and unload the hive. If the value/schema is unexpected or the hive cannot safely be loaded, leave WSA intact and report a manual fallback.
+
+
+### 2026-11-05 — Automatic WSA Developer mode implementation
+- ✅ Added `Get-WsaSettingsApplicationId` to discover the Settings app ID from the installed WSA manifest instead of hard-coding it.
+- ✅ Added `Enable-WsaDeveloperMode` to the fresh-install path immediately after WSA AppX registration succeeds. The existing-package early-exit path and previous-userdata safety gate remain ahead of this call, so existing WSA installations are not modified.
+- ✅ The helper initializes the per-user `settings.dat` file via the registered WSA Settings app only when the file does not exist; it captures pre-existing `WsaSettings.exe` PIDs and only closes a Settings process started by this helper.
+- ✅ The helper creates a timestamped backup before attempting a registry-hive mount. It uses `reg.exe load/unload` and native Registry APIs to read/write only `DeveloperModeEnabled`; it does not copy or replace the whole hive.
+- ✅ Existing values are accepted only when registry type `0x05F5E10B`, length 9, and the flag byte is either 0 or 1. When disabled, only byte 0 is changed to 1 and the 8-byte metadata is preserved. When missing, the helper creates the 9-byte value with the enabled byte and current FILETIME metadata. It then reads the value back to verify enabled state.
+- ✅ Automatic enablement failure is non-fatal to WSA registration; it reports a manual WSA Settings fallback. It does not change Windows OS Developer Mode and never touches the separate Windows Grass application.
+- ✅ Updated README to explain fresh-install-only behaviour, backup, manual fallback, ADB exposure, and the remaining Android ADB authorization prompt.
+- ✅ Updated Windows CI checks to require the helper functions, ensure the call follows successful fresh registration, reject Windows `AppModelUnlock` changes, and compile the embedded C# raw-registry helper.
+- 🔄 Windows CI run #177 (run ID `41952560140`) is in progress for commit `c9c4d96a3ce5b704955d6231b50efe8e59c09f28`. Await the result before declaring static/build validation complete.
+- ⏳ Real WSA fresh-install behaviour has not been tested. Current registered WSA is an existing installation and is intentionally excluded from modification.
