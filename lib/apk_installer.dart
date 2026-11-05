@@ -194,6 +194,11 @@ class _ApkInstallerState extends State<ApkInstaller> {
                         ),
                         const SizedBox(width: 8.0),
                         Button(
+                          child: Text(lang.btn_dev_settings),
+                          onPressed: () => WSAUtils.launchDeveloperSettings(),
+                        ),
+                        const SizedBox(width: 8.0),
+                        Button(
                           child: Text(lang.btn_retry_connection),
                           onPressed: () => WSAPeriodicConnector.reconnect(),
                         ),
