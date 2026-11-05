@@ -605,6 +605,12 @@ function Enable-WsaDeveloperMode($Package) {
         }
         $hiveLoaded = $true
 
+        # Ensure the WSA settings container exists without replacing or clearing it.
+        & $regExe add "$hiveMount\LocalState" /f | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not create or open the WSA LocalState settings key (reg.exe exit code $LASTEXITCODE)."
+        }
+
         if (-not ('WsaPacmanRawRegistryValue' -as [type])) {
             $registryHelperSource = @'
 using System;
