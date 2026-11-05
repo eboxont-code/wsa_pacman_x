@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Reconcile WSA PacMan status with live ADB state** — the user's screenshot shows WSA PacMan v1.5.0 reporting `Arrested / WSA is turned off`, while the earlier terminal output showed ADB device `127.0.0.1:58526` and Android boot status `1`. The explicit Grass `am start` command has **not** been run. Recheck/start WSA through PacMan before launch-testing Grass. Do not touch the separate Windows Grass desktop app.
+- 🔄 **Diagnose why WSA ADB disconnected after the PacMan Turn on attempt** — latest `adb devices` returned an empty list, and querying the previous serial `127.0.0.1:58526` returned `device not found`. Recheck `WsaService`, WSA client/VM processes, PacMan process, and current ADB device list. Do not attempt Grass launch until ADB reconnects. Keep the separate Windows Grass desktop app untouched.
 
 ## Project goal
 
@@ -281,5 +281,16 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ The same screenshot shows prior PowerShell output from the earlier diagnostics: ADB listed `127.0.0.1:58526 device`, `sys.boot_completed` returned `1`, `pm path io.getgrass.www` returned an APK path, and activity resolution returned `io.getgrass.www/.MainActivity`.
 - ⚠️ The screenshot does not show the newly supplied `am start -W` launch command or its output. User explicitly clarified they have not run/pasted that new command yet. Grass launch has therefore **not** been tested.
 - ⚠️ PacMan's current UI state (`Arrested / WSA is turned off`) conflicts with the earlier ADB/boot output. The earlier command output may be from a prior moment; take a fresh state reading rather than assume WSA is still online.
-- 🔄 Current task changed from Grass launch testing to reconciling WSA state: use PacMan's visible `Turn on` control, wait for its state to update, then recheck ADB before running any Grass launch command.
+- ✅ User followed the requested step and rechecked ADB after the PacMan `Turn on` attempt. `adb devices` now returns an empty list; querying prior serial `127.0.0.1:58526` returns `device not found`.
+- ⚠️ The previous ADB-connected state is no longer present in this latest snapshot. Grass has not been launched; no `am start` command has been run.
+- 🔄 Current next action: inspect WSA service/process state and the current ADB device list together, then determine whether WSA failed to start, stopped, or came up on a different endpoint.
 - ✅ Explicitly preserve the user's rule: do not touch the separate Windows Grass desktop application or its installation.
+
+
+### 2026-11-05 — ADB disconnected after PacMan Turn on attempt
+- ✅ User ran: `$a='C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe'; 'DEVICES:'; & $a devices; 'BOOT STATUS:'; & $a -s 127.0.0.1:58526 shell getprop sys.boot_completed`.
+- ✅ Output under `DEVICES:` was only `List of devices attached` with no serial.
+- ✅ The old serial check returned `adb.exe: device '127.0.0.1:58526' not found`.
+- ⚠️ This confirms the previous ADB connection is gone in this snapshot. It does not establish whether WSA stopped, Android is still booting, or the ADB endpoint changed.
+- ✅ User has not run the explicit Grass launch command; Grass runtime launch remains untested.
+- 🔄 Next diagnostic: capture WSA service state, WSA-related process names/paths, PacMan process, and current ADB devices in one read-only check. Do not change or uninstall anything named Grass.
