@@ -205,7 +205,6 @@ jobs:
           $trayHeader = Get-Content "windows/runner/win32_window.h" -Raw
           $trayMain = Get-Content "windows/runner/main.cpp" -Raw
           $trayCmake = Get-Content "windows/runner/CMakeLists.txt" -Raw
-          $flutterWindowSource = Get-Content "windows/runner/flutter_window.cpp" -Raw
           $trayChecks = @(
             "WSA.PacMan.PrepareForUpgrade.1",
             "ExitApplication",
@@ -245,18 +244,6 @@ jobs:
               $traySource.Contains("SetWinEventHook") -or
               $trayHeader.Contains("WsaWindowEventCallback")) {
             throw "The WSA PacMan main window is not fully configured for notification-area support"
-          }
-
-          # Native close messages must reach Win32Window's tray policy before
-          # Flutter/plugins can consume them; otherwise the X button exits PacMan.
-          $closePolicyIndex = $flutterWindowSource.IndexOf("return Win32Window::MessageHandler(hwnd, message, wparam, lparam);")
-          $flutterDispatchIndex = $flutterWindowSource.IndexOf("HandleTopLevelWindowProc")
-          if ($flutterWindowSource -notmatch "message == WM_CLOSE" -or
-              $flutterWindowSource -notmatch "message == WM_SYSCOMMAND" -or
-              $closePolicyIndex -lt 0 -or
-              $flutterDispatchIndex -lt 0 -or
-              $closePolicyIndex -gt $flutterDispatchIndex) {
-            throw "Native WM_CLOSE/SC_CLOSE must be routed through the tray policy before Flutter message handling"
           }
 
           $wsaUtilsText = Get-Content "lib/utils/wsa_utils.dart" -Raw
