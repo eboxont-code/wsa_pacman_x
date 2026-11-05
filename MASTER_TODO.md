@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Diagnose why WSA ADB disconnected after the PacMan Turn on attempt** — latest `adb devices` returned an empty list, and querying the previous serial `127.0.0.1:58526` returned `device not found`. Recheck `WsaService`, WSA client/VM processes, PacMan process, and current ADB device list. Do not attempt Grass launch until ADB reconnects. Keep the separate Windows Grass desktop app untouched.
+- 🔄 **Find why the WSA ADB endpoint is unavailable while WSA processes remain running** — latest snapshot shows `WsaService` Running, `WsaClient.exe`, `vmmemWSA`, `WSACrashUploader.exe`, and `WSA-pacman.exe` present, but `adb devices -l` is empty. Inspect whether the old port `58526` is listening and identify current WSA-owned listening ports before trying to reconnect. Do not launch Grass until ADB is connected. Keep the separate Windows Grass desktop app untouched.
 
 ## Project goal
 
@@ -294,3 +294,13 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ⚠️ This confirms the previous ADB connection is gone in this snapshot. It does not establish whether WSA stopped, Android is still booting, or the ADB endpoint changed.
 - ✅ User has not run the explicit Grass launch command; Grass runtime launch remains untested.
 - 🔄 Next diagnostic: capture WSA service state, WSA-related process names/paths, PacMan process, and current ADB devices in one read-only check. Do not change or uninstall anything named Grass.
+
+
+### 2026-11-05 — WSA processes present but ADB list empty
+- ✅ User ran a read-only combined state check.
+- ✅ `Get-Service WsaService`: service status `Running`, start type `Manual`.
+- ✅ WSA-related process inventory contains `WSACrashUploader.exe`, `WsaClient.exe`, `WsaService.exe`, and `vmmemWSA`; PacMan process inventory contains `WSA-pacman.exe`.
+- ✅ Bundled `adb devices -l` returned only `List of devices attached`; no serial/device is currently connected.
+- ⚠️ User's terminal also showed `adb.exe: device '127.0.0.1:58526' not found` when querying the previously known serial. That serial is stale/unavailable in this snapshot.
+- ⚠️ These process/service observations do not prove Android has completed boot or that its host-side ADB TCP endpoint is listening.
+- 🔄 Next: inspect TCP listening endpoints for the known port `58526`, ADB server port `5037`, and current WSA process PIDs. Then choose a verified current endpoint instead of assuming the old one.
