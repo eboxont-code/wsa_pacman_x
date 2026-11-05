@@ -210,11 +210,8 @@ class WSAPeriodicConnector {
     } else {
       await _tryConnect();
     }
-    //else status = ConnectionStatus.DISCONNECTED;
-    /*if (status != prevStatus) {
-      (alert.title as Text).data = ""
-    }*/
-    else await _tryConnect();
+    // No WSA endpoint was found in the device list, so _tryConnect()
+    // was already attempted in the fallback branch above.
     if (status != prevStatus) GState.connectionStatus.update((p0) => status.statusAlert);
     _statusInitialized = false;
     log("Connection status: ${status.name()}");
