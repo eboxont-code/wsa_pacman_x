@@ -93,9 +93,9 @@ Name: "{group}\Install matching WSA Android runtime"; \
 Name: "{group}\Uninstall WSA PacMan"; Filename: "{uninstallexe}"; IconFilename: "{app}\{#executable}"
 
 [UninstallDelete]
-; Remove every remaining file/folder inside the PacMan install directory.
-Type: filesandordirs; Name: "{app}\*"
-; Remove this user's PacMan settings and the legacy settings folder. Keep WSA itself under ProgramData\WSABuilds.
+; Inno automatically removes files/folders recorded from the [Files] section.
+; Explicitly remove this user's PacMan settings and legacy settings folder only.
+; Keep WSA itself under ProgramData\WSABuilds.
 Type: filesandordirs; Name: "{%USERPROFILE}\.wsa-pacman"
 Type: filesandordirs; Name: "{%USERPROFILE}\.wsamanager"
 
