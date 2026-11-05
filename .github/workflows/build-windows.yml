@@ -18,6 +18,7 @@ on:
       - fix/offline-adb-diagnostic
       - fix/auto-detect-wsa-adb-endpoint
       - fix/offline-open-wsa-settings
+      - test/direct-apk-install-flow
   workflow_dispatch:
 
 permissions:
