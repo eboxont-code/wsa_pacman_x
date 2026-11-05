@@ -114,7 +114,8 @@ jobs:
             "pre-dev-mode.",
             "Enable-WsaDeveloperMode -Package $registeredPackage",
             "Do not replace the complete hive",
-            '$hiveSubKey = "$hiveName\LocalState"'
+            '$hiveSubKey = "$hiveName\LocalState"',
+            '& $regExe add "$hiveMount\LocalState" /f | Out-Null'
           )
           foreach ($check in $requiredChecks) {
             if ($scriptText -notmatch [regex]::Escape($check)) {
