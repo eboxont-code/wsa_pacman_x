@@ -121,6 +121,20 @@ jobs:
             }
           }
 
+          $registrySourceNode = $ast.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+              $node.Value.Contains("WsaPacmanRawRegistryValue") -and
+              $node.Value.Contains("RegSetValue")
+          }, $true) | Select-Object -First 1
+          if ($null -eq $registrySourceNode) {
+            throw "The WSA raw registry helper source is missing"
+          }
+          Add-Type -TypeDefinition $registrySourceNode.Value -ErrorAction Stop
+          if (-not ("WsaPacmanRawRegistryValue" -as [type])) {
+            throw "The WSA raw registry helper did not compile"
+          }
+
           if ($scriptText -match "AppModelUnlock") {
             throw "WSA Android Developer mode must not be confused with Windows OS Developer Mode"
           }
