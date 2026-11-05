@@ -192,7 +192,8 @@ jobs:
           if ($uninstallCleanupEntries.Count -lt 2) {
             throw "The installer must clean both PacMan settings directories"
           }
-          if ($installerText.Contains('Type: filesandordirs; Name: "{app}\\*')) {
+          $unsafeInstallCleanup = @($uninstallCleanupEntries | Where-Object { $_.Contains("{app}") -and $_.Contains("*") })
+          if ($unsafeInstallCleanup.Count -gt 0) {
             throw "Do not wildcard-delete the install directory; Inno tracks and removes installed files itself"
           }
           if (($uninstallCleanupEntries -join "`n").Contains("WSABuilds") -or
