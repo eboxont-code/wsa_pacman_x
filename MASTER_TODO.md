@@ -175,4 +175,10 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 2026-11-04 — WSA AppX registration confirmed
 - ✅ `Get-AppxPackage` confirms WSA package version `2407.40000.4.0`, architecture x64, status `Ok`, at `C:\\ProgramData\\WSABuilds\\WSA-Windows_11_2407.40000.4.0_LTS_8\\WSA_2407.40000.4.0_x64`.
 - ✅ `WsaService` remains running, but `WsaClient.exe` was not running in the latest process snapshot.
-- ⏳ Next: inspect the WSA AppX manifest for the actual Application ID/Executable, then launch by registered package family/application ID.
+- ✅ Manifest confirms WSA launch app ID `App` (`WsaClient\\WsaClient.exe`, `Windows.FullTrustApplication`); settings app ID is `SettingsApp`.
+- ⏳ Next: launch `MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe!App` via AppsFolder and verify `WsaClient.exe` starts.
+
+
+### 2026-11-05 — WSA launch entry point confirmed
+- ✅ `Get-AppxPackageManifest` lists application ID `App`, executable `WsaClient\\WsaClient.exe`, entry point `Windows.FullTrustApplication`; `SettingsApp` is the settings application.
+- ⏳ Next: launch WSA through the registered AppsFolder identity and confirm its client process becomes available before retrying ADB.
