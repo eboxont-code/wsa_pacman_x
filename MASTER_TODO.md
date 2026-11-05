@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Find why the WSA ADB endpoint is unavailable while WSA processes remain running** — latest snapshot shows `WsaService` Running, `WsaClient.exe`, `vmmemWSA`, `WSACrashUploader.exe`, and `WSA-pacman.exe` present, but `adb devices -l` is empty. Inspect whether the old port `58526` is listening and identify current WSA-owned listening ports before trying to reconnect. Do not launch Grass until ADB is connected. Keep the separate Windows Grass desktop app untouched.
+- 🔄 **Locate the live WSA ADB endpoint** — WSA service/client/VM and PacMan processes are present, and the local ADB server is listening on `127.0.0.1:5037` (PID `4140`), but `adb devices -l` is empty and no listener/connection for the former `58526` endpoint was shown. Inspect current WSA process IDs/command lines and their sockets before reconnecting. Do not launch Grass until ADB is connected; do not touch the separate Windows Grass app.
 
 ## Project goal
 
@@ -304,3 +304,14 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ⚠️ User's terminal also showed `adb.exe: device '127.0.0.1:58526' not found` when querying the previously known serial. That serial is stale/unavailable in this snapshot.
 - ⚠️ These process/service observations do not prove Android has completed boot or that its host-side ADB TCP endpoint is listening.
 - 🔄 Next: inspect TCP listening endpoints for the known port `58526`, ADB server port `5037`, and current WSA process PIDs. Then choose a verified current endpoint instead of assuming the old one.
+
+
+### 2026-11-05 — Detailed WSA/ADB process and socket snapshot
+- ✅ User supplied the accumulated diagnostic history, including the initial failed process-name lookup (`WSA-pacman` not found), later discovery of `WSA-pacman.exe` at `C:\\Program Files\\WSA PacMan\\WSA-pacman.exe`, successful prior ADB connection at `127.0.0.1:58526 device`, Android boot value `1`, installed Grass APK path, and resolved activity `io.getgrass.www/.MainActivity`.
+- ✅ Latest service/process snapshot again reports `WsaService` Running (Manual), `WsaClient.exe`, `WsaService.exe`, `vmmemWSA`, `WSACrashUploader.exe`, and `WSA-pacman.exe` present.
+- ✅ Latest `adb devices -l` is empty; prior serial `127.0.0.1:58526` is not currently connected.
+- ✅ TCP inspection identifies the local ADB server: `adb.exe` PID `4140`, executable `C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe`, command line `adb -L tcp:5037 fork-server server --reply-fd 584`; it is listening on `127.0.0.1:5037`.
+- ✅ TCP output also shows local ADB-process-owned connections on ports `5092`–`5095` (PID `4140`). These are not evidence of an active WSA Android device by themselves.
+- ⚠️ No TCP entry for old endpoint `58526` was present in the supplied filtered output; do not assume it remains WSA's current endpoint.
+- ⚠️ The current ADB server is running, but has zero attached Android transports. Distinguish ADB server availability (port `5037`) from WSA device connectivity.
+- 🔄 Next: inspect current WSA client/service command lines and sockets by their live PIDs; do not retry package/launch commands until `adb devices` shows an attached device.
