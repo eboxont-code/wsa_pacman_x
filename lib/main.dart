@@ -120,7 +120,7 @@ class WSAPeriodicConnector {
     try {
       await _checkConnectionStatusOnce();
     } catch (error, stackTrace) {
-      log("WSA/ADB connection check failed: $error\\n$stackTrace");
+      log("WSA/ADB connection check failed: $error\n$stackTrace");
       final fallbackStatus = Env.WSA_INSTALLED
           ? ConnectionStatus.OFFLINE
           : ConnectionStatus.DISCONNECTED;
@@ -204,7 +204,7 @@ class WSAPeriodicConnector {
         .processTimeout(const Duration(seconds: 3));
     final stdout = process.stdout?.toString() ?? '';
     final stderr = process.stderr?.toString() ?? '';
-    final output = '$stdout\\n$stderr';
+    final output = '$stdout\n$stderr';
     final outcome = classifyAdbConnectOutcome(
       exitCode: process.exitCode,
       stdout: stdout,
