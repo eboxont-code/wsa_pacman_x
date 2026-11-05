@@ -17,6 +17,7 @@ struct SavedWindow {
 SRWLOCK g_lock = SRWLOCK_INIT;
 std::unordered_map<HWND, SavedWindow> g_hidden;
 std::unordered_set<HWND> g_pending_close;
+volatile LONG g_hook_execution_logged = 0;
 
 void AppendHookDiagnostic(const wchar_t* message) {
   wchar_t temp_path[MAX_PATH + 1] = {};
@@ -47,6 +48,16 @@ void AppendHookDiagnostic(const wchar_t* message) {
               &written, nullptr);
   }
   CloseHandle(file);
+}
+
+void LogHookExecutionOnce(const wchar_t* callback_name) {
+  if (InterlockedCompareExchange(&g_hook_execution_logged, 1, 0) != 0) {
+    return;
+  }
+  wchar_t message[320] = {};
+  swprintf_s(message, L"Hook DLL executed inside process. PID=%lu TID=%lu first_callback=%s",
+             GetCurrentProcessId(), GetCurrentThreadId(), callback_name);
+  AppendHookDiagnostic(message);
 }
 
 bool IsWsaClientWindow(HWND window) {
@@ -175,6 +186,7 @@ bool IsClosePending(HWND window) {
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCbtProc(
     int code, WPARAM wparam, LPARAM lparam) {
+  LogHookExecutionOnce(L"WH_CBT");
   if (code == HCBT_SYSCOMMAND) {
     // For HCBT_SYSCOMMAND, wParam is the SC_* command, not an HWND.
     // This CBT hook is thread-specific, so GetActiveWindow returns the
@@ -203,6 +215,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCbtProc(
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayGetMessageProc(
     int code, WPARAM wparam, LPARAM lparam) {
+  LogHookExecutionOnce(L"WH_GETMESSAGE");
   if (code >= 0 && wparam == PM_REMOVE && lparam != 0) {
     auto message = reinterpret_cast<MSG*>(lparam);
     if (message->message == kWsaAppTrayCallbackMessage &&
@@ -219,6 +232,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayGetMessageProc(
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCallWndProc(
     int code, WPARAM wparam, LPARAM lparam) {
+  LogHookExecutionOnce(L"WH_CALLWNDPROC");
   if (code >= 0 && lparam != 0) {
     const auto message = reinterpret_cast<const CWPSTRUCT*>(lparam);
     if (message->message == kWsaAppTrayRestoreManagerMessage) {
@@ -236,6 +250,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCallWndProc(
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK WsaAppTrayCallWndRetProc(
     int code, WPARAM wparam, LPARAM lparam) {
+  LogHookExecutionOnce(L"WH_CALLWNDPROCRET");
   if (code >= 0 && lparam != 0) {
     const auto message = reinterpret_cast<const CWPRETSTRUCT*>(lparam);
     if (message->message == WM_CLOSE) {
