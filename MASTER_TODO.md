@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Check WSA Developer mode and wake the Android subsystem** — latest client command line includes `/partiallyrunning`; Microsoft documents Partially running as a low-resource subsystem mode, so this flag alone is not a failure. WSA processes are alive but ADB has no attached device. Open WSA Settings, verify Developer mode, and use the Files action to bring the subsystem up before reconnecting ADB. Do not launch Grass until a device is connected. Do not touch the separate Windows Grass desktop app.
+- 🔄 **Diagnose WSA Android runtime startup hang** — user confirms Developer mode is ON, but WSA Settings > Files remains loading and never opens. ADB currently has no connected device. Investigate startup logs and runtime state before attempting Grass launch. Do not touch the separate Windows Grass desktop app.
 
 ## Project goal
 
@@ -334,3 +334,11 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ ADB server remains a separate listener on 127.0.0.1:5037 (PID 4140) from the immediately preceding diagnostic; it does not mean an Android device is attached.
 - ℹ️ Microsoft Support documents the WSA **Partially running** memory/performance mode as retaining minimal resources while allowing apps to start faster than **As needed**. Therefore, the `/partiallyrunning` argument is consistent with a documented WSA operating mode and is not, by itself, evidence of a crash or fault. Source: https://support.microsoft.com/en-us/windows/apps/mobileapps/manage-settings-for-mobile-apps-on-windows
 - 🔄 Next: open the registered WSA Settings app (`SettingsApp`), inspect Advanced settings > Developer mode, and use the Files action to wake the subsystem. Then run `adb devices` and use the current developer-settings endpoint rather than assuming port 58526.
+
+
+### 2026-11-05 — WSA Files action hangs with Developer mode enabled
+- ✅ User confirms WSA Settings > Advanced settings > Developer mode is ON.
+- ❌ User reports opening the WSA **Files** action takes a very long time and remains stuck loading.
+- ✅ This is an additional failure beyond the Grass APK launch: WSA itself is not completing the normal Android Files/startup path, while ADB has no attached device.
+- ⚠️ Do not assume Grass is the cause; APK launch remains unattempted.
+- 🔄 Current task: diagnose WSA startup/runtime using read-only Windows event-channel and WSA process/service evidence. Do not uninstall/reinstall WSA or alter either Grass installation.
