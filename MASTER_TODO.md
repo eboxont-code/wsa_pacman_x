@@ -31,8 +31,7 @@
 
 ## Current task
 
-- ⏳ **Fresh-install runtime verification of automatic WSA Android Developer mode** — installer implementation and CI run #187 passed; actual first-install behaviour still needs a fresh WSA installation. Do not modify the user's existing WSA installation.
-- **Scope guard:** the active work is WSA Android Developer mode auto-enablement only. The unrelated Grass APK launch investigation is paused and must not drive the current task unless the user explicitly asks to resume it.
+- 🔄 **Fix and validate the WSA DeveloperModeEnabled registry subkey** — source review found the helper currently targets the settings.dat hive root, but the WSA-specific reference writes the value under `LocalState`. Correct the helper and add a CI guard that requires the correct subkey. Preserve the fresh-install-only gate and do not modify the user's existing WSA installation.
 
 ## Project goal
 
@@ -821,3 +820,12 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Parked the unrelated Grass APK launch investigation; it is not the current task and will not be pursued unless explicitly requested.
 - ✅ Reaffirmed the current technical milestone: validate the existing fresh-install `settings.dat` patch that sets WSA's Android `DeveloperModeEnabled` value; existing WSA installation must remain untouched.
 - ⏳ Remaining evidence: run the installer on a separate fresh WSA installation and confirm the WSA Settings toggle is ON after installation. CI run #187 proves build/static validation only, not the live first-install result.
+
+
+### 2026-11-05 — Implementation review found likely registry subkey defect
+- ✅ Re-read the current task and the fresh-install-only safeguards before changing code.
+- ✅ Inspected `wsa-runtime/Install-WSA.ps1`: `Enable-WsaDeveloperMode` initializes `$hiveSubKey = $hiveName`, which directs native registry read/write calls at the mounted hive root.
+- ✅ WSA-specific reference implementation under 4PDA explicitly creates/uses `[HKEY_LOCAL_MACHINE\WSA\LocalState]` before writing `DeveloperModeEnabled`: https://4pda.to/forum/index.php?showtopic=1035138&st=760
+- ✅ Independent settings.dat structural research describes the hive tree as a root key with a `LocalState` subkey and identifies `0x05F5E10B` as Boolean with one value byte plus 8-byte FILETIME metadata: https://urock-ailab.github.io/forensics-handbook/windows/01-foundations/app-mail-data/packages-settings-dat.html
+- ⚠️ The current helper's root-key target therefore appears incorrect; CI run #187 did not catch it because its checks require the value name/type and C# compilation but do not assert the `LocalState` target.
+- 🔄 Current work: change the helper subkey to `$hiveName\LocalState`, require that target explicitly in Windows CI, then rerun the build workflow. Existing WSA installations remain outside the installer helper's existing-package early-exit path and will not be modified.
