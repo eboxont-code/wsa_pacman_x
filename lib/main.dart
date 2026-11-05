@@ -175,13 +175,43 @@ class WSAPeriodicConnector {
   }
 
   static Future<void> _tryConnect() async {
-    ProcessResult? process = await ADBUtils.connectWSA().processTimeout(const Duration(milliseconds: 200));
-    if (process.stdout?.toString().contains(RegExp(r'(^|\n)(cannot|failed to) connect\s.*')) ?? true) 
-      status = Env.WSA_INSTALLED ? (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.STARTING) && shouldWaitStart ? 
-          ConnectionStatus.STARTING : ConnectionStatus.OFFLINE : ConnectionStatus.DISCONNECTED;
-    else if (process.stdout?.toString().contains(RegExp(r'(^|\n)(cannot|failed to) authenticate\s.*')) ?? true) 
+    // Starting the bundled ADB process and its server can take longer than
+    // 200 ms on Windows, particularly immediately after WSA boots. Keep the
+    // timeout below the five-second polling interval to avoid overlapping
+    // connection attempts.
+    final ProcessResult process = await ADBUtils.connectWSA()
+        .processTimeout(const Duration(seconds: 3));
+    final output = (process.stdout?.toString() ?? '') +
+        '\n' + (process.stderr?.toString() ?? '');
+    final failedToConnect = RegExp(
+      r'(^|\n)(cannot|failed to) connect\s.*',
+      caseSensitive: false,
+    ).hasMatch(output);
+    final failedToAuthenticate = RegExp(
+      r'(^|\n)(cannot|failed to) authenticate\s.*',
+      caseSensitive: false,
+    ).hasMatch(output);
+
+    if (process.isTimeout || failedToConnect ||
+        (process.exitCode != 0 && !failedToAuthenticate)) {
+      if (process.isTimeout) {
+        log("ADB connection attempt timed out after 3 seconds");
+      } else {
+        log("ADB connection attempt failed (exit code: " +
+            process.exitCode.toString() + "): " + output);
+      }
+      status = Env.WSA_INSTALLED
+          ? (status == ConnectionStatus.ARRESTED ||
+                  status == ConnectionStatus.STARTING)
+              && shouldWaitStart
+              ? ConnectionStatus.STARTING
+              : ConnectionStatus.OFFLINE
+          : ConnectionStatus.DISCONNECTED;
+    } else if (failedToAuthenticate) {
       status = ConnectionStatus.UNAUTHORIZED;
-    else status = ConnectionStatus.CONNECTED;
+    } else {
+      status = ConnectionStatus.CONNECTED;
+    }
   }
 }
 
