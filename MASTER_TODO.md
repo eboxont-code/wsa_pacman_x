@@ -31,7 +31,7 @@
 
 ## Current task
 
-- ⏳ **Runtime verification of the updated per-app tray hooks** — CI #206 passed and a checksum-verified installer/portable build is ready. Still need runtime evidence from the user's WSA desktop: window discovery, hook registration, injected callback execution, NIM_ADD, and one-app-only close/restore. Do not claim runtime success before that evidence.
+- ⏳ **Runtime verification of each Android app's X-to-tray behavior** — the user clarified that the X requirement applies to every WSA-hosted Android app window, not the WSA PacMan manager. A diagnostic portable build from PR #12 is ready. Await a real WSA test and `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` to verify WsaClient window discovery, hook registration/injection, close interception, per-window NIM_ADD, and isolated restore.
 
 ## Project goal
 
@@ -906,3 +906,13 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Inspected outer artifact listing; it contains exactly the portable package and Windows installer.
 - ✅ Branch includes only the TODO documentation commit after tested source head `c01fb3f5be1c4122341421c33280eb07b5f3a121`; no source code changed after the run #206 build.
 - ⏳ Next: use the test installer/package and inspect `%TEMP%\\WsaPacMan-AppTray-Diagnostics.log` on the WSA machine. Look for matched WsaClient HWND/PID/TID, each hook registration status, `Hook DLL executed inside process`, and `Per-app notification icon successfully added` or a specific failure. Runtime behaviour is still unverified.
+
+### 2026-11-05 — User clarified the per-app Android X requirement
+- ✅ User clarified that clicking X on **each installed/running Android app** must hide only that app window into its own notification-area tray icon; this is not a request to change WSA PacMan's own close button.
+- ✅ Reverted the unrelated PacMan-manager X-button source/check change from PR #22 and restored PR #22's scope to APK install readiness only.
+- ✅ Confirmed PR #12 (`wsa/per-app-tray-icons`) is the correct implementation branch. Its native manager scans visible top-level `WsaClient.exe` windows, installs hooks on each target UI thread, and the injected DLL creates/removes a tray icon keyed to that app window handle.
+- ✅ Confirmed the latest PR #12 source head `9993f0a1ec3afaccf6c7c19dc91e95a3169653a1` passed Windows CI run #209 (run ID `41958924006`). CI success confirms compile/package only, not actual WSA hook execution.
+- ✅ Downloaded and inspected artifact `13385150499`. Outer ZIP SHA-256: `130185fd08afb1b83238c0973596d4874f1496021afbaaae46e34e31fa14ac50`; installer SHA-256: `6437ea04066b8208e1e0bfad861f8446a13e795a59ce321e628cd0be1a1f9814`; portable ZIP SHA-256: `4e80e3451455bb3f369f1c41d5910f13fea86d47695bf8fa23141ee045af3e87`.
+- ✅ Verified the portable ZIP contains `WsaPacManAppTrayHook.dll`, `WSA-pacman.exe`, and `flutter_windows.dll`.
+- ⚠️ Runtime result remains unverified. Need a test against a live WSA Android app and the diagnostic log before claiming X interception works for all app windows.
+- ⏳ Next: test the diagnostic portable manager alongside the already-installed Android apps; click X on one app; confirm only that app hides and gets its own tray icon; restore it; then share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` if it still closes or no tray icon appears.
