@@ -9,6 +9,7 @@ import 'package:archive/archive_io.dart';
 import 'package:shared_value/shared_value.dart';
 import 'package:wsa_pacman/io/isolate_runner.dart';
 import 'package:wsa_pacman/utils/future_utils.dart';
+import 'package:wsa_pacman/utils/install_flow.dart';
 import 'package:wsa_pacman/utils/wsa_utils.dart';
 import 'package:wsa_pacman/windows/nt_io.dart';
 import 'package:wsa_pacman/windows/win_io.dart';
@@ -44,6 +45,7 @@ class ApkReader extends IsolateRunner<String, APK_READER_FLAGS> {
   static late Future<Map<int, String>> _stringDump;
   static late Future<Archive> _apkArchive;
   static int _versionCode = 0;
+  static bool _hasVersionCode = false;
 
   static const String REGEX_QUOTED_TYPE = r'["'']type[0-9]+/([0-9]*)["'']';
 
@@ -226,6 +228,10 @@ class ApkReader extends IsolateRunner<String, APK_READER_FLAGS> {
   } else return null;}
 
   void loadInstallInfoOnUIThread(String package, int versionCode) => package.isNotEmpty ? executeInUi(() {
+    // Keep the parsed package metadata available to the reconnect recovery
+    // path; the first dumpsys query may run before WSA's ADB endpoint is ready.
+    _versionCode = versionCode;
+    _hasVersionCode = true;
     GState.package.update((_) => package);
     loadInstallType(package, versionCode);
   }) : null;
@@ -363,14 +369,48 @@ class ApkReader extends IsolateRunner<String, APK_READER_FLAGS> {
     GState.legacyIcons.doWhenReady((value) {
       isolate.sendFlag(APK_READER_FLAGS.LEGACY_ICON, value);
     });
-    late StreamSubscription sub; sub = GState.connectionStatus.stream.listen((event) async {
-      String package = GState.package.$;
-      InstallType? installType = GState.apkInstallType.$;
-      if (GState.apkInstallType.$ == InstallType.UNKNOWN) {
-        await loadInstallType(GState.package.$, _versionCode);
-        if (GState.apkInstallType.$ != InstallType.UNKNOWN) sub.cancel();
+
+    // The first package inspection can finish while WSA is offline and set
+    // InstallType.UNKNOWN. The old connection-only listener missed the case
+    // where the connection event arrived before APK metadata was parsed. Watch
+    // both signals so whichever becomes ready last triggers a fresh dumpsys.
+    bool refreshInProgress = false;
+    late StreamSubscription connectionSubscription;
+    late StreamSubscription installTypeSubscription;
+
+    Future<void> refreshInstallTypeIfReady() async {
+      final installType = GState.apkInstallType.$;
+      final shouldRefresh = shouldRefreshInstallType(
+        isConnected: GState.connectionStatus.$.isConnected,
+        hasUnknownInstallType: installType == InstallType.UNKNOWN,
+        hasPackage: GState.package.$.isNotEmpty,
+        hasVersionCode: _hasVersionCode,
+        refreshInProgress: refreshInProgress,
+      );
+
+      if (shouldRefresh) {
+        refreshInProgress = true;
+        try {
+          await loadInstallType(GState.package.$, _versionCode);
+        } finally {
+          refreshInProgress = false;
+        }
       }
-      else if (installType != null) sub.cancel();
-    });
+
+      final resolvedType = GState.apkInstallType.$;
+      if (resolvedType != null && resolvedType != InstallType.UNKNOWN) {
+        connectionSubscription.cancel();
+        installTypeSubscription.cancel();
+      }
+    }
+
+    connectionSubscription =
+        GState.connectionStatus.stream.listen((_) => refreshInstallTypeIfReady());
+    installTypeSubscription =
+        GState.apkInstallType.stream.listen((_) => refreshInstallTypeIfReady());
+
+    // Also handle the case where both the connection and APK metadata became
+    // ready before these listeners were attached.
+    refreshInstallTypeIfReady();
   }
 }
