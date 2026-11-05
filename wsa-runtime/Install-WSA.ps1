@@ -806,13 +806,22 @@ function Enable-WsaDeveloperMode($Package) {
         $settingsDirectory = Join-Path (Join-Path $env:LOCALAPPDATA 'Packages') (Join-Path $Package.PackageFamilyName 'Settings')
         $settingsPath = Join-Path $settingsDirectory 'settings.dat'
 
+        $settingsAppLaunchedBySetup = $false
+        $settingsProcessIdsBeforeLaunch = @()
         if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
             # First launch creates WSA's per-user settings hive. Launch the
             # package's registered Settings app rather than assuming an ID.
+            $settingsExecutable = Join-Path $Package.InstallLocation 'WsaSettings.exe'
+            $settingsProcessIdsBeforeLaunch = @(
+                Get-CimInstance Win32_Process -Filter "Name='WsaSettings.exe'" -ErrorAction SilentlyContinue |
+                    Where-Object { $_.ExecutablePath -and $_.ExecutablePath -ieq $settingsExecutable } |
+                    Select-Object -ExpandProperty ProcessId
+            )
             $settingsApplicationId = Get-WsaSettingsApplicationId -InstallLocation $Package.InstallLocation
             $aumid = "$($Package.PackageFamilyName)!$settingsApplicationId"
             Write-Info 'Initializing the new WSA user settings hive.'
             Start-Process -FilePath (Join-Path $env:SystemRoot 'explorer.exe') -ArgumentList "shell:AppsFolder\$aumid" -WindowStyle Hidden | Out-Null
+            $settingsAppLaunchedBySetup = $true
 
             $deadline = (Get-Date).AddSeconds(60)
             while ((Get-Date) -lt $deadline -and -not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
@@ -824,26 +833,30 @@ function Enable-WsaDeveloperMode($Package) {
             throw "WSA did not create its settings.dat file at $settingsPath within 60 seconds."
         }
 
-        # The hive can remain open while the Settings app is running. Only close
-        # a WsaSettings.exe instance launched by this setup invocation; never
-        # terminate a pre-existing Settings process.
-        $settingsExecutable = Join-Path $Package.InstallLocation 'WsaSettings.exe'
-        if (Test-Path -LiteralPath $settingsExecutable -PathType Leaf) {
-            $settingsProcesses = @(
-                Get-CimInstance Win32_Process -Filter "Name='WsaSettings.exe'" -ErrorAction SilentlyContinue |
-                    Where-Object { $_.ExecutablePath -and $_.ExecutablePath -ieq $settingsExecutable }
-            )
-            foreach ($settingsProcess in $settingsProcesses) {
-                try {
-                    $process = Get-Process -Id ([int]$settingsProcess.ProcessId) -ErrorAction Stop
-                    if ($process.MainWindowHandle -ne 0) {
-                        [void]$process.CloseMainWindow()
-                        [void]$process.WaitForExit(5000)
+        # Close only a WsaSettings.exe process that did not exist before this
+        # setup launched the Settings app. Never close the user's existing app.
+        if ($settingsAppLaunchedBySetup) {
+            $settingsExecutable = Join-Path $Package.InstallLocation 'WsaSettings.exe'
+            if (Test-Path -LiteralPath $settingsExecutable -PathType Leaf) {
+                $newSettingsProcesses = @(
+                    Get-CimInstance Win32_Process -Filter "Name='WsaSettings.exe'" -ErrorAction SilentlyContinue |
+                        Where-Object {
+                            $_.ExecutablePath -and
+                            $_.ExecutablePath -ieq $settingsExecutable -and
+                            $_.ProcessId -notin $settingsProcessIdsBeforeLaunch
+                        }
+                )
+                foreach ($settingsProcess in $newSettingsProcesses) {
+                    try {
+                        $process = Get-Process -Id ([int]$settingsProcess.ProcessId) -ErrorAction Stop
+                        if ($process.MainWindowHandle -ne 0) {
+                            [void]$process.CloseMainWindow()
+                            [void]$process.WaitForExit(5000)
+                        }
                     }
-                }
-                catch {
-                    # If it is still running, reg.exe load below fails safely;
-                    # do not force-close an app that may belong to the user.
+                    catch {
+                        # If it remains active, reg.exe load below fails safely.
+                    }
                 }
             }
         }
@@ -926,7 +939,7 @@ public static class WsaPacmanRawRegistryValue
             if (size > 65536)
                 return new WsaPacmanRegistryReadResult(ERROR_INVALID_DATA, type, null);
 
-            byte[] data = new byte[size];
+            byte[] data = new byte[(int)size];
             if (size > 0)
             {
                 status = RegQueryValueData(key, valueName, IntPtr.Zero, out type, data, ref size);
