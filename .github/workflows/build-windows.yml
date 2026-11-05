@@ -17,6 +17,8 @@ on:
       - fix/direct-apk-launch-and-status
       - fix/offline-adb-diagnostic
       - fix/auto-detect-wsa-adb-endpoint
+      - fix/offline-open-wsa-settings
+      - fix/guided-developer-mode-retry
   workflow_dispatch:
 
 permissions:
