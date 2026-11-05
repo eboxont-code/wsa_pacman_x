@@ -181,6 +181,11 @@ class _ApkInstallerState extends State<ApkInstaller> {
                           child: Text(lang.btn_boot),
                           onPressed: () => WSAUtils.launch(),
                         ),
+                      ] else if (connectionStatus.type == ConnectionStatus.OFFLINE) ...[
+                        Button(
+                          child: Text(lang.btn_open_wsa_settings),
+                          onPressed: () => WSAUtils.launchWsaSettings(),
+                        ),
                       ] else if (connectionStatus.type == ConnectionStatus.UNAUTHORIZED) ...[
                         Button(
                           child: Text(lang.btn_auth),
