@@ -31,7 +31,9 @@
 
 ## Current task
 
-- ⏳ **Fresh-install runtime verification of automatic WSA Android Developer mode** — corrected installer code and CI run #196 passed, including a disposable Windows registry write/read test and full Windows package build. The only unverified step is observing the WSA Developer mode toggle after a genuinely fresh WSA install. Do not modify the user's existing WSA installation.
+- 🔄 **Fix the per-Android-app tray behaviour that failed runtime testing** — the reported failure is that WSA PacMan's own tray icon appears, but individual Android app windows do not get their own tray icons. Focus only on the per-app window hook/injection path and its diagnostics. Do not switch to Grass APK launch troubleshooting.
+- ⏸️ **Automatic WSA Android Developer mode** is parked after CI #196 passed; fresh-install runtime verification is deferred.
+- ⏸️ Grass APK launch investigation is parked and out of scope.
 
 ## Project goal
 
@@ -854,3 +856,11 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Final CI run #196 (run ID `41956388049`, commit `4f9d0db57b27db8d9c89ce59bb0509218b0d4787`) passed all steps. Final artifact ID `13383916487`, SHA-256 `63633ed0e69faab513c421a2af6cad5f172c27929570bdb79bb561983a907f2c`.
 - ✅ PR #12 remains OPEN and UNMERGED on `wsa/per-app-tray-icons`.
 - ⚠️ This is now build- and registry-helper-tested, but not yet runtime-verified against a genuinely fresh WSA installation. Existing WSA installation remains untouched.
+
+
+### 2026-11-05 — User reprioritized per-app Android tray failure
+- ✅ User chose to address the app-behaviour issue before attempting any further WSA Developer mode verification.
+- ✅ Active issue selected from existing runtime evidence: WSA PacMan's own tray icon appeared, but individual Android app tray icons did not appear. This is the per-app tray-hook implementation in PR #12.
+- ✅ Parked automatic WSA Android Developer mode after CI #196; its fresh-install test is not the active task.
+- ✅ Parked the separate Grass APK investigation; do not return to it unless the user explicitly asks.
+- 🔄 Current task: inspect the per-app hook implementation, process/window discovery, hook installation errors, DLL exports/loading, and recorded diagnostics. Work only on this per-app tray behaviour until this task is fixed or a precise external runtime dependency is identified.
