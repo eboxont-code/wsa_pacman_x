@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Validate the fresh-install WSA Developer mode implementation** — code and documentation are committed. Windows CI is checking PowerShell parsing, native registry-helper compilation, fresh-install-only ordering, and the Windows build. WSA runtime mutation still needs a fresh-install test; do not alter the user's existing WSA or either Grass installation.
+- 🔄 **Repair the WSA runtime installer after CI exposed a malformed function insertion** — CI parser error points at the original `Install-WsaFromFolder` body. Restore the clean baseline script, reapply Developer mode helpers safely without JavaScript replacement-string interpolation, then rerun PowerShell parsing and Windows CI. Do not touch existing WSA data or either Grass installation.
 
 ## Project goal
 
@@ -380,3 +380,12 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Updated Windows CI checks to require the helper functions, ensure the call follows successful fresh registration, reject Windows `AppModelUnlock` changes, and compile the embedded C# raw-registry helper.
 - 🔄 Windows CI run #177 (run ID `41952560140`) is in progress for commit `c9c4d96a3ce5b704955d6231b50efe8e59c09f28`. Await the result before declaring static/build validation complete.
 - ⏳ Real WSA fresh-install behaviour has not been tested. Current registered WSA is an existing installation and is intentionally excluded from modification.
+
+
+### 2026-11-05 — CI caught a malformed runtime installer insertion
+- ❌ Windows CI runs #177–#180 failed in the WSA runtime validation step with PowerShell parser error: `Unexpected token 'Run.bat' -File -Recurse`, followed by `Write-Info 'Registering' in expression or statement.`
+- ✅ Investigation compared the branch file with clean `main` at the pre-feature baseline. The branch script had a truncated `Get-WsaSettingsApplicationId` function inserted in the middle of the original `Install-WsaFromFolder` function; the original function body then continued without its declaration.
+- ✅ Root cause: JavaScript `String.replace(search, replacementString)` interpreted the literal PowerShell substring `$'` in the regex `WsaSettings\.exe$` as the JavaScript replacement token for the source suffix. This silently truncated the inserted helper and corrupted the source file. Future GitHub content replacements must use a callback replacer or avoid replacement-string tokens.
+- ✅ The CI run #181 (run ID `41953197241`) uses an improved PowerShell parser diagnostic that should report exact line/column. It was still running at the time of this TODO update.
+- 🔄 Immediate remediation: restore `wsa-runtime/Install-WSA.ps1` from the clean main-branch baseline, reapply the WSA Developer mode helper with callback-based source insertion, and verify the resulting function boundaries before rerunning CI.
+- ⏳ Do not mark Developer mode automatic enablement complete until the PowerShell parser, embedded C# compile, and full Windows packaging all pass.
