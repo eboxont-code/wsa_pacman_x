@@ -41,14 +41,6 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // The bitsdojo_window CloseWindowButton sends SC_CLOSE. Handle the manager
-  // close policy before Flutter/plugins can consume the native close message;
-  // otherwise WM_CLOSE/SC_CLOSE can bypass Win32Window's close-to-tray logic.
-  if (message == WM_CLOSE ||
-      (message == WM_SYSCOMMAND && (wparam & 0xFFF0) == SC_CLOSE)) {
-    return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
-  }
-
   // Give Flutter, including plugins, an opportunity to handle other messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
