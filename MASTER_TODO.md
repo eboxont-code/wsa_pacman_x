@@ -193,4 +193,11 @@ Every Android app window running under WSA must behave independently in the Wind
 
 ### 2026-11-05 — PacMan process lookup mismatch
 - ⚠️ ADB diagnostic returned `PacMan bundled ADB not found` because `Get-Process -Name WSA-pacman` returned no matching process/path in that snapshot. This is not evidence that ADB or WSA is broken; the ADB command was not run.
-- ⏳ Next: inspect process names and executable paths for WSA/PacMan processes, then locate ADB without modifying any installed applications.
+- ✅ Read-only process inventory shows `WsaClient.exe` (PID `19080`), `WsaService.exe` (PID `5800`), `vmmemWSA` (PID `11996`), and `WSACrashUploader.exe` (PID `26100`). No WSA PacMan process was present in that snapshot.
+- ⏳ Next: user opens WSA PacMan and leaves it running; identify its actual executable path, then locate bundled ADB.
+
+
+### 2026-11-05 — WSA and manager process inventory
+- ✅ User's read-only `Win32_Process` query shows `WsaClient.exe` PID `19080`, `WsaService.exe` PID `5800`, `vmmemWSA` PID `11996`, and `WSACrashUploader.exe` PID `26100`.
+- ⚠️ No WSA PacMan process appeared in the snapshot; the prior process-based ADB lookup could not proceed because its manager executable was not running.
+- ⏳ Next: open WSA PacMan, keep it open, identify its executable path, then locate its bundled ADB and inspect Android connectivity. Preserve the explicit exclusion for the separate Windows Grass application.
