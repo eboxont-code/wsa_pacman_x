@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Validate per-app hook retry, injection diagnostics, and optional-hook handling in Windows CI** — manager now retries transient failures after 10 seconds, the DLL logs its first execution in the target process, and only CBT + GETMESSAGE are required for core tray behaviour. Windows CI runs #205 and #206 are in progress. Runtime behaviour is not yet verified.
+- ⏳ **Runtime verification of the updated per-app tray hooks** — retry, target-process execution diagnostics, and optional-hook handling passed Windows CI #206. The next proof is a real WSA session: confirm WsaClient windows are discovered, injected callback logs appear, and closing/restoring one Android window affects only that app. Code/build success alone is not runtime proof.
 
 ## Project goal
 
@@ -883,5 +883,16 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Added CI source guards for retry deadlines, target-process execution logging, and optional fallback handling.
 - ✅ Files changed: `windows/runner/win32_window.h`, `windows/runner/win32_window.cpp`, `windows/runner/app_tray_hook.cpp`, `.github/workflows/build-windows.yml`.
 - ✅ Intermediate CI run #201 (run ID `41957976735`) passed after the retry mechanism and injected-process diagnostic changes. An intermediate commit before the manager implementation was synchronized failed compilation as expected; it was superseded.
-- 🔄 Latest Windows CI runs: #205 (run ID `41958305351`) validates retry/injection changes; #206 (run ID `41958321969`) includes the optional-hook fallback change. Both are currently in progress.
+- ✅ Windows CI run #205 (run ID `41958305351`) passed full Windows app build, portable package, and installer build for retry/injection diagnostics.
+- ✅ Final Windows CI run #206 (run ID `41958321969`, tested code head `c01fb3f5be1c4122341421c33280eb07b5f3a121`) completed successfully, including runtime source validation, Windows app build, portable package verification, installer build, and artifact upload.
+- ✅ Latest Windows artifact ID `13383843525`; ZIP size `53,862,765` bytes; SHA-256 `7e340896b741ee70359d04174fdbeae9d62b936ce7c67373c508b7cf1166a7cc`; expires `2026-11-19T02:59:14Z`.
 - ⚠️ No user-machine runtime log has been read during this job. Code/CI success will not be reported as proof of per-app tray runtime success.
+
+
+### 2026-11-05 — Per-app tray resiliency build passed
+- ✅ Confirmed run #205 passed the full Windows app/portable/installer build.
+- ✅ Confirmed final run #206 (run ID `41958321969`) passed all CI steps, including the new CI guards for per-thread retry, first injected-process callback telemetry, and optional `WM_CLOSE` fallback hooks.
+- ✅ Artifact ID `13383843525`, archive SHA-256 `7e340896b741ee70359d04174fdbeae9d62b936ce7c67373c508b7cf1166a7cc`, size `53,862,765` bytes.
+- ⚠️ The workflow run tested code head `c01fb3f5be1c4122341421c33280eb07b5f3a121`; the branch then advanced with TODO documentation commit(s). No source changes were made after the tested code head in this job.
+- ✅ PR #12 remains OPEN and UNMERGED, targeting `main`.
+- ⏳ Remaining: real WSA runtime test with the updated package and inspect `%TEMP%\\WsaPacMan-AppTray-Diagnostics.log`. Specifically confirm a `Hook DLL executed inside process` line with WsaClient PID, hook registration results, and per-app NIM_ADD outcome. The close/restore operation must affect exactly one app window.
