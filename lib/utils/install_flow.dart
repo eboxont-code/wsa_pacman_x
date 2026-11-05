@@ -20,3 +20,21 @@ bool canInstallPackage({
 }) {
   return isConnected && hasKnownInstallType;
 }
+
+/// The APK inspection can finish while WSA is still offline. Once ADB is
+/// connected, retry the package query if that first attempt left the type
+/// unknown. Require parsed package/version metadata and avoid overlapping
+/// refresh requests.
+bool shouldRefreshInstallType({
+  required bool isConnected,
+  required bool hasUnknownInstallType,
+  required bool hasPackage,
+  required bool hasVersionCode,
+  required bool refreshInProgress,
+}) {
+  return isConnected &&
+      hasUnknownInstallType &&
+      hasPackage &&
+      hasVersionCode &&
+      !refreshInProgress;
+}
