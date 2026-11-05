@@ -173,6 +173,8 @@ class _ApkInstallerState extends State<ApkInstaller> {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(connectionStatus.desc(lang)),
+                      if (GState.adbConnectionDiagnostic.of(context).isNotEmpty)
+                        Text(GState.adbConnectionDiagnostic.of(context)),
                       if (connectionStatus.type == ConnectionStatus.ARRESTED) ...[
                         const SizedBox(width: 15.0),
                         Button(
