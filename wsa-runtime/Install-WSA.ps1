@@ -876,7 +876,7 @@ function Enable-WsaDeveloperMode($Package) {
         $hiveLoaded = $true
 
         if (-not ('WsaPacmanRawRegistryValue' -as [type])) {
-            Add-Type -TypeDefinition @'
+            $registryHelperSource = @'
 using System;
 using System.Runtime.InteropServices;
 
@@ -974,7 +974,8 @@ public static class WsaPacmanRawRegistryValue
         }
     }
 }
-'@ -ErrorAction Stop
+'@
+            Add-Type -TypeDefinition $registryHelperSource -ErrorAction Stop
         }
 
         # WSA stores DeveloperModeEnabled as a 9-byte custom registry value.
