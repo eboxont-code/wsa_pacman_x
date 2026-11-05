@@ -2,7 +2,7 @@
 /// as a shell:AppsFolder target. Only the installed WSA package is accepted.
 String? parseWsaSettingsAppId(String output) {
   final appId = output.trim();
-  if (appId.isEmpty || appId.contains(RegExp(r'\\s'))) return null;
+  if (appId.isEmpty || appId.contains(RegExp(r'\s'))) return null;
 
   const packagePrefix =
       'MicrosoftCorporationII.WindowsSubsystemForAndroid_';
