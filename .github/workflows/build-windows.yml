@@ -180,7 +180,6 @@ jobs:
             "CreateUninstallRegKey=yes",
             "UninstallDisplayName=WSA PacMan",
             'Name: "{group}\Uninstall WSA PacMan"; Filename: "{uninstallexe}"',
-            'Type: filesandordirs; Name: "{app}\*"',
             'Type: filesandordirs; Name: "{%USERPROFILE}\.wsa-pacman"',
             'Type: filesandordirs; Name: "{%USERPROFILE}\.wsamanager"'
           )
@@ -190,8 +189,11 @@ jobs:
             }
           }
           $uninstallCleanupEntries = @($installerText -split "`n" | Where-Object { $_ -match "^Type: filesandordirs;" })
-          if ($uninstallCleanupEntries.Count -lt 3) {
-            throw "The installer must clean the app directory and both PacMan settings directories"
+          if ($uninstallCleanupEntries.Count -lt 2) {
+            throw "The installer must clean both PacMan settings directories"
+          }
+          if ($installerText.Contains('Type: filesandordirs; Name: "{app}\\*')) {
+            throw "Do not wildcard-delete the install directory; Inno tracks and removes installed files itself"
           }
           if (($uninstallCleanupEntries -join "`n").Contains("WSABuilds") -or
               ($uninstallCleanupEntries -join "`n").Contains("ProgramData")) {
