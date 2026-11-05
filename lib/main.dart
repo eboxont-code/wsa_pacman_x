@@ -109,7 +109,31 @@ class WSAPeriodicConnector {
   static WSAStatusAlert alertStatus = ConnectionStatus.UNKNOWN.statusAlert;
   static bool _statusInitialized = false;
 
+  static bool _connectionCheckInProgress = false;
+
   static void _checkConnectionStatus() async {
+    // Timer.periodic does not wait for an async callback to finish. Prevent a
+    // slow ADB/WSA probe from overlapping the next scheduled probe.
+    if (_connectionCheckInProgress) return;
+    _connectionCheckInProgress = true;
+    try {
+      await _checkConnectionStatusOnce();
+    } catch (error, stackTrace) {
+      // A missing, blocked or unexpectedly terminated adb.exe must not leave
+      // the periodic status loop throwing unhandled async errors.
+      log("WSA/ADB connection check failed: $error\n$stackTrace");
+      final fallbackStatus = Env.WSA_INSTALLED
+          ? ConnectionStatus.OFFLINE
+          : ConnectionStatus.DISCONNECTED;
+      if (status != fallbackStatus) {
+        GState.connectionStatus.$ = (status = fallbackStatus).statusAlert;
+      }
+    } finally {
+      _connectionCheckInProgress = false;
+    }
+  }
+
+  static Future<void> _checkConnectionStatusOnce() async {
     if (_statusInitialized) {
       Process.run('${Env.SYSTEM_ROOT}\\System32\\tasklist.exe', []).then((result){
         if (!result.stdout.toString().contains(RegExp(r'(^|\n)adb.exe\s+'))) {
