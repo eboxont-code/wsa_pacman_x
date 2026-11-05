@@ -981,6 +981,7 @@ public static class WsaPacmanRawRegistryValue
         # WSA stores DeveloperModeEnabled as a 9-byte custom registry value.
         # Preserve its 8-byte metadata when the value already exists.
         $developerModeValueType = [uint32]0x05F5E10B
+        $patchSucceeded = $false
         $read = [WsaPacmanRawRegistryValue]::Read($hiveSubKey, 'DeveloperModeEnabled')
 
         if ($read.Status -eq 2) {
@@ -1005,41 +1006,47 @@ public static class WsaPacmanRawRegistryValue
             }
             if ($read.Data[0] -eq 1) {
                 Write-Info 'WSA Android Developer mode is already enabled.'
-                return $true
+                $patchSucceeded = $true
+            }
+            else {
+                $payload = [byte[]]$read.Data.Clone()
+                $payload[0] = 1
+                $writeType = $read.Type
+                Write-Info 'Enabling WSA Android Developer mode while preserving the existing hive metadata.'
+            }
+        }
+
+        if (-not $patchSucceeded) {
+            $writeStatus = [WsaPacmanRawRegistryValue]::Write($hiveSubKey, 'DeveloperModeEnabled', $writeType, $payload)
+            if ($writeStatus -ne 0) {
+                throw "Could not write WSA DeveloperModeEnabled (Windows registry error $writeStatus)."
             }
 
-            $payload = [byte[]]$read.Data.Clone()
-            $payload[0] = 1
-            $writeType = $read.Type
-            Write-Info 'Enabling WSA Android Developer mode while preserving the existing hive metadata.'
-        }
+            $verify = [WsaPacmanRawRegistryValue]::Read($hiveSubKey, 'DeveloperModeEnabled')
+            if ($verify.Status -ne 0 -or $verify.Type -ne $writeType -or $verify.Data.Length -ne 9 -or $verify.Data[0] -ne 1) {
+                throw 'WSA DeveloperModeEnabled read-back verification failed.'
+            }
 
-        $writeStatus = [WsaPacmanRawRegistryValue]::Write($hiveSubKey, 'DeveloperModeEnabled', $writeType, $payload)
-        if ($writeStatus -ne 0) {
-            throw "Could not write WSA DeveloperModeEnabled (Windows registry error $writeStatus)."
+            Write-Info 'WSA Android Developer mode was enabled and verified in settings.dat.'
+            $patchSucceeded = $true
         }
-
-        $verify = [WsaPacmanRawRegistryValue]::Read($hiveSubKey, 'DeveloperModeEnabled')
-        if ($verify.Status -ne 0 -or $verify.Type -ne $writeType -or $verify.Data.Length -ne 9 -or $verify.Data[0] -ne 1) {
-            throw 'WSA DeveloperModeEnabled read-back verification failed.'
-        }
-
-        Write-Info 'WSA Android Developer mode was enabled and verified in settings.dat.'
-        return $true
     }
     catch {
         Write-WarningMessage "Could not enable WSA Android Developer mode automatically: $($_.Exception.Message)"
         Write-Host 'WSA remains installed. Open WSA Settings > Advanced settings and turn Developer mode on manually if needed.'
-        return $false
+        $patchSucceeded = $false
     }
     finally {
         if ($hiveLoaded) {
             & $regExe unload $hiveMount | Out-Null
             if ($LASTEXITCODE -ne 0) {
                 Write-WarningMessage 'The temporary WSA settings hive could not be unloaded cleanly. Restart Windows before manually editing WSA settings.'
+                $patchSucceeded = $false
             }
         }
     }
+
+    return [bool]$patchSucceeded
 }
 
 function Install-WsaFromFolder([string]$Folder) {
