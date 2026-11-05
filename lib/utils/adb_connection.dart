@@ -49,7 +49,7 @@ String describeAdbConnectFailure({
   }
 
   final details = '$stdout $stderr'
-      .replaceAll(RegExp(r'\\s+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
   if (details.isEmpty) {
     return 'Could not connect to $endpoint (ADB exit code $exitCode).';
