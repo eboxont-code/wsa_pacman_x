@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_value/shared_value.dart';
 import 'package:wsa_pacman/io/isolate_runner.dart';
 import 'package:wsa_pacman/utils/misc_utils.dart';
+import 'package:wsa_pacman/utils/adb_connection.dart';
 import 'package:wsa_pacman/utils/wsa_utils.dart';
 import 'package:wsa_pacman/utils/locale_utils.dart';
 import 'package:wsa_pacman/widget/themed_pane_item.dart';
@@ -205,19 +206,17 @@ class WSAPeriodicConnector {
     // connection attempts.
     final ProcessResult process = await ADBUtils.connectWSA()
         .processTimeout(const Duration(seconds: 3));
-    final output = (process.stdout?.toString() ?? '') +
-        '\n' + (process.stderr?.toString() ?? '');
-    final failedToConnect = RegExp(
-      r'(^|\n)(cannot|failed to) connect\s.*',
-      caseSensitive: false,
-    ).hasMatch(output);
-    final failedToAuthenticate = RegExp(
-      r'(^|\n)(cannot|failed to) authenticate\s.*',
-      caseSensitive: false,
-    ).hasMatch(output);
+    final stdout = process.stdout?.toString() ?? '';
+    final stderr = process.stderr?.toString() ?? '';
+    final output = '$stdout\n$stderr';
+    final outcome = classifyAdbConnectOutcome(
+      exitCode: process.exitCode,
+      stdout: stdout,
+      stderr: stderr,
+      timedOut: process.isTimeout,
+    );
 
-    if (process.isTimeout || failedToConnect ||
-        (process.exitCode != 0 && !failedToAuthenticate)) {
+    if (outcome == AdbConnectOutcome.failed) {
       if (process.isTimeout) {
         log("ADB connection attempt timed out after 3 seconds");
       } else {
@@ -231,7 +230,7 @@ class WSAPeriodicConnector {
               ? ConnectionStatus.STARTING
               : ConnectionStatus.OFFLINE
           : ConnectionStatus.DISCONNECTED;
-    } else if (failedToAuthenticate) {
+    } else if (outcome == AdbConnectOutcome.unauthorized) {
       status = ConnectionStatus.UNAUTHORIZED;
     } else {
       status = ConnectionStatus.CONNECTED;
