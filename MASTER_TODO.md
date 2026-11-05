@@ -15,6 +15,11 @@
 5. Preserve this file across branches and releases. When working on a PR branch, update this file on that branch so the progress is committed with the work.
 6. Do not claim runtime behaviour is verified just because the code compiles or CI passes.
 
+7. **Log every requested job:** every user-requested job for this project must be recorded in this file, not only coding tasks. This includes read-only checks, troubleshooting, research, reviews, planning, documentation, build/package work, and tests. Record the task, important commands (each command on one physical line), observed outputs/evidence, conclusions, files or systems changed, commit/build/test references, failures or blockers, and the next action. Do not silently omit investigation steps just because no source code changed.
+
+8. **No unlogged work:** before starting a job, add it to **Current task** as `🔄 WORKING`; while working, keep material findings recorded; at completion, update the work log and current status. A job is not complete until its TODO entry is updated. If a new job arrives while another is waiting, record the waiting state before switching tasks.
+
+
 ## Status key
 
 - ✅ **DONE** — completed and verified
@@ -26,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Audit and synchronize this master TODO** — reconcile the documented work with all recent WSA/Grass troubleshooting steps, correct stale status/facts, and formalize the rule that every requested project job must be logged here.
+- ⏳ **Verify the Android Grass package and launch behaviour** — WSA is running and ADB now sees `127.0.0.1:58526 device`. Waiting for the user to run the pending boot/package/activity query below. The Windows Grass desktop app remains explicitly excluded.
 
 ## Project goal
 
@@ -78,6 +83,13 @@ Every Android app window running under WSA must behave independently in the Wind
 - ✅ User explicitly instructed not to touch this separate Windows Grass application. Do not modify or remove its files, registry entries, or installation.
 - ⏳ The earlier screenshot listed Grass 3.6.1 / getgrass.io / 146 MB; whether that represented a distinct stale item or UI snapshot remains unverified. Do not infer it is the same registry entry.
 - ✅ Identified Grass 3.6.1 Android package ID as `io.getgrass.www`.
+- ✅ WSA AppX package is present and reports status `Ok`: `MicrosoftCorporationII.WindowsSubsystemForAndroid_2407.40000.4.0_x64__8wekyb3d8bbwe` (version `2407.40000.4.0`).
+- ✅ WSA manifest identifies launch application ID `App`, executable `WsaClient\\WsaClient.exe`, entry point `Windows.FullTrustApplication`; `SettingsApp` is the settings app ID.
+- ✅ User started WSA through `shell:AppsFolder\\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe!App`; `WsaClient.exe` was observed running as PID `19080`.
+- ✅ User later opened WSA PacMan; `WSA-pacman.exe` was observed as PID `28796` at `C:\\Program Files\\WSA PacMan\\WSA-pacman.exe`.
+- ✅ Direct bundled ADB command succeeded: `C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe devices` returned `127.0.0.1:58526 device`.
+- ⏳ Android boot completion, APK package presence, resolved launch activity, and Grass launch/logcat behaviour are **not yet checked**; await the pending query result.
+
 - ✅ Source review confirms PacMan's Manage apps button launches Android's `ManageApplicationsActivity`; it does not implement Windows uninstall-registry cleanup.
 - ✅ Microsoft's WSA help identifies WSA Settings > Apps as the list of installed Android apps. WSA community docs report stale per-app uninstall entries can remain under HKCU Uninstall after normal Android uninstall.
 - ✅ Reviewed diagnostic-only code changes and confirmed CI #141 compiled and packaged successfully; this does not prove the installed app starts correctly.
@@ -111,13 +123,40 @@ Every Android app window running under WSA must behave independently in the Wind
 
 - PR #12 is open and targets `main`.
 - PR branch: `wsa/per-app-tray-icons`.
-- Current PR head: `3c44440b72516bf5741986c621a69d5feb01bb89`.
+- Current PR head before final TODO synchronization: `535e7df83a4ae0af3357bae55c81d3534f00a89c` (the final documentation commit advances the branch again).
 - Latest CI run: [#141](https://github.com/eboxont-code/wsa_pacman_x/actions/runs/41826799475), successful.
 - Diagnostic artifact ID: `13319523119`; expires 2026-11-18.
 - Diagnostic installer SHA-256: `47f63ec128666462bcbe67483338eb0841d552911cc21f54bace13386d49f0e2`.
 - Diagnostic artifact ZIP SHA-256: `84b0adcced9346deee96644fdcea06a0fc6ffec13388d14abb4a3c915bb6847d`.
 - CI success confirms build/package validation; **it does not prove runtime behaviour on the user's WSA installation**.
 - PR #12 has not been merged.
+
+
+## WSA / Android Grass troubleshooting — current evidence
+
+This investigation is separate from the per-app tray runtime test. It concerns the Android APK target `io.getgrass.www`, not the separate Windows desktop Grass application. The Windows Grass app (Grass 8.1.0, Grass OpCo Ltd., `C:\\Program Files\\Grass`) is out of scope and must not be modified, uninstalled, or cleaned.
+
+### Confirmed device and process sequence (2026-11-04 to 2026-11-05)
+
+- ✅ Initial ADB discovery found PacMan's bundled `adb.exe`, but `adb devices` returned an empty device list; `pm list packages io.getgrass.www` then failed with `no devices/emulators found`.
+- ✅ Read-only service/process check showed `WsaService` running (start type `Manual`) and no `WsaClient.exe` process at that time.
+- ✅ `Get-AppxPackage` found installed WSA package `MicrosoftCorporationII.WindowsSubsystemForAndroid_2407.40000.4.0_x64__8wekyb3d8bbwe`, version `2407.40000.4.0`, status `Ok`, installation root `C:\\ProgramData\\WSABuilds\\WSA-Windows_11_2407.40000.4.0_LTS_8\\WSA_2407.40000.4.0_x64`.
+- ✅ Manifest inspection command: `Get-AppxPackage -Name MicrosoftCorporationII.WindowsSubsystemForAndroid | Get-AppxPackageManifest | Select-Xml -XPath "//*[local-name()='Application']" | ForEach-Object {$_.Node | Select-Object Id,Executable,EntryPoint}`.
+- ✅ Manifest output: `App` → `WsaClient\\WsaClient.exe`, `Windows.FullTrustApplication`; `SettingsApp` → `WsaSettings.exe`, `WsaSettings.App`.
+- ✅ User launched `shell:AppsFolder\\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe!App`; after 10 seconds, `WsaClient.exe` was running (PID `19080`).
+- ⚠️ One attempted ADB lookup used `Get-Process -Name 'WSA-pacman'`; it returned no matching process/path, so no ADB command was executed in that attempt. This was a manager-process lookup mismatch, not proof of an ADB failure.
+- ✅ Read-only process inventory showed `WsaClient.exe` PID `19080`, `WsaService.exe` PID `5800`, `vmmemWSA` PID `11996`, and `WSACrashUploader.exe` PID `26100`; WSA PacMan was not open in that snapshot.
+- ✅ After the user opened WSA PacMan, process inventory identified `WSA-pacman.exe` PID `28796`, executable `C:\\Program Files\\WSA PacMan\\WSA-pacman.exe`.
+- ✅ The actual bundled ADB path is `C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe`.
+- ✅ Direct command `& 'C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe' devices` returned `List of devices attached` followed by `127.0.0.1:58526 device`.
+- 🔄 Next diagnostic is pending user execution; do not infer the Grass APK is installed or launchable yet.
+
+### Pending one-line PowerShell diagnostic
+
+`$a='C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe'; $s='127.0.0.1:58526'; 'BOOT STATUS:'; & $a -s $s shell getprop sys.boot_completed; 'GRASS APK PATH:'; & $a -s $s shell pm path io.getgrass.www; 'LAUNCH ACTIVITY:'; & $a -s $s shell cmd package resolve-activity --brief io.getgrass.www`
+
+Expected evidence to capture: Android boot-completed value, whether `pm path` returns an APK path, and whether Android resolves a launch activity. If package resolution fails or Grass is absent, investigate Android package state before attempting launch. If installed and resolvable, capture launch result and relevant logcat errors.
+
 
 ## Work log
 
@@ -213,3 +252,14 @@ Every Android app window running under WSA must behave independently in the Wind
 ### 2026-11-05 — Android device reachable over ADB
 - ✅ User ran bundled ADB from `C:\\Program Files\\WSA PacMan\\embedded-tools\\adb.exe`; `adb devices` returned `127.0.0.1:58526 device`.
 - ⏳ Next: verify Android boot completion and inspect Android package `io.getgrass.www`; then diagnose launch failure from Android-side evidence. Do not modify the separate Windows Grass app.
+
+
+### 2026-11-05 — Master TODO audit and logging rule
+- 🔄 Started a full audit because the user requested that all prior work missing from this Markdown be added and that every future job be recorded.
+- ✅ Re-read the full `MASTER_TODO.md` and fetched PR #12 metadata. PR #12 remains open, unmerged, targets `main`; latest head before this synchronization was `535e7df83a4ae0af3357bae55c81d3534f00a89c`.
+- ✅ Corrected the stale Current task text: ADB is connected at `127.0.0.1:58526 device`; Android package status is the pending task.
+- ✅ Added the WSA AppX package version/status, manifest app IDs, successful AppsFolder launch, WSA process inventory, PacMan executable/PID, actual bundled ADB path, first failed process-name lookup, and successful ADB device result.
+- ✅ Added a dedicated chronological WSA/Android troubleshooting record and preserved the explicit exclusion of the separate Windows Grass desktop application.
+- ✅ Added a permanent rule: every requested project job must be logged, including read-only checks, troubleshooting, research, review, planning, documentation, builds, and tests. Record important one-line commands, outputs/evidence, decisions, changes, commits, verification, failures/blockers, and next steps.
+- ✅ Restated the completion rule: a job is not complete until its work-log and current status are updated in this file.
+- ⏳ Current follow-on task remains waiting for the user's output from the pending Android boot/package/activity query.
