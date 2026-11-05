@@ -136,6 +136,47 @@ jobs:
             throw "The WSA raw registry helper did not compile"
           }
 
+          # Exercise the compiled raw registry helper against a disposable HKLM key.
+          # WSA settings use a custom Boolean type and preserve an 8-byte FILETIME suffix.
+          $testRootKey = "SOFTWARE\WSAPacmanDeveloperModeTest_$([guid]::NewGuid().ToString('N'))"
+          $testSubKey = "$testRootKey\LocalState"
+          try {
+            New-Item -Path "Registry::HKEY_LOCAL_MACHINE\$testSubKey" -Force | Out-Null
+            $testPayload = New-Object byte[] 9
+            [byte[]]$testMetadata = [BitConverter]::GetBytes([DateTime]::UtcNow.ToFileTimeUtc())
+            [Array]::Copy($testMetadata, 0, $testPayload, 1, 8)
+            $testWriteStatus = [WsaPacmanRawRegistryValue]::Write($testSubKey, "DeveloperModeEnabled", [uint32]0x05F5E10B, $testPayload)
+            if ($testWriteStatus -ne 0) {
+              throw "Raw registry helper could not write the disabled fixture (status $testWriteStatus)"
+            }
+            $testRead = [WsaPacmanRawRegistryValue]::Read($testSubKey, "DeveloperModeEnabled")
+            if ($testRead.Status -ne 0 -or $testRead.Type -ne [uint32]0x05F5E10B -or $testRead.Data.Length -ne 9 -or $testRead.Data[0] -ne 0) {
+              throw "Raw registry helper could not read back the 9-byte WSA Boolean fixture"
+            }
+            $testEnabledPayload = [byte[]]$testRead.Data.Clone()
+            $testEnabledPayload[0] = 1
+            $testWriteStatus = [WsaPacmanRawRegistryValue]::Write($testSubKey, "DeveloperModeEnabled", [uint32]0x05F5E10B, $testEnabledPayload)
+            if ($testWriteStatus -ne 0) {
+              throw "Raw registry helper could not enable the fixture (status $testWriteStatus)"
+            }
+            $testEnabledRead = [WsaPacmanRawRegistryValue]::Read($testSubKey, "DeveloperModeEnabled")
+            if ($testEnabledRead.Status -ne 0 -or $testEnabledRead.Type -ne [uint32]0x05F5E10B -or $testEnabledRead.Data.Length -ne 9 -or $testEnabledRead.Data[0] -ne 1) {
+              throw "Raw registry helper could not verify the enabled WSA Boolean fixture"
+            }
+            for ($index = 1; $index -lt 9; $index++) {
+              if ($testEnabledRead.Data[$index] -ne $testMetadata[$index - 1]) {
+                throw "Developer mode update changed timestamp metadata at byte $index"
+              }
+            }
+            $testRootRead = [WsaPacmanRawRegistryValue]::Read($testRootKey, "DeveloperModeEnabled")
+            if ($testRootRead.Status -ne 2) {
+              throw "DeveloperModeEnabled was written to the hive root instead of LocalState"
+            }
+          }
+          finally {
+            Remove-Item -LiteralPath "Registry::HKEY_LOCAL_MACHINE\$testRootKey" -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
           if ($scriptText -match "AppModelUnlock") {
             throw "WSA Android Developer mode must not be confused with Windows OS Developer Mode"
           }
