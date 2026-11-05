@@ -154,3 +154,24 @@ WsaAdbEndpoint? findWsaAdbEndpoint(
 
   return candidates.length == 1 ? candidates.single : null;
 }
+
+/// WSA can take noticeably longer to expose its ADB endpoint on a cold boot.
+/// Keep probing quickly for a bounded startup window, then return to the
+/// normal low-frequency background check.
+const Duration wsaStartupRetryWindow = Duration(seconds: 60);
+const Duration wsaStartupPollInterval = Duration(seconds: 1);
+const Duration wsaSteadyPollInterval = Duration(seconds: 5);
+
+bool isWsaStartupPending({
+  required int startedAtMilliseconds,
+  required int nowMilliseconds,
+}) {
+  if (startedAtMilliseconds <= 0 || nowMilliseconds < startedAtMilliseconds) {
+    return false;
+  }
+  return nowMilliseconds - startedAtMilliseconds <
+      wsaStartupRetryWindow.inMilliseconds;
+}
+
+Duration wsaConnectionPollInterval({required bool startupPending}) =>
+    startupPending ? wsaStartupPollInterval : wsaSteadyPollInterval;

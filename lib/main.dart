@@ -102,10 +102,25 @@ class Env {
 class WSAPeriodicConnector {
   static const PERIODIC_CHECK_BOOT_DURATION = Duration(milliseconds: 500);
   static const PERIODIC_CHECK_SLEEPING_DURATION = Duration(milliseconds: 750);
-  static const PERIODIC_CHECK_CONNECT_DURATION = Duration(seconds: 5);
+  static const PERIODIC_CHECK_CONNECT_DURATION = wsaSteadyPollInterval;
   static int lastStart = 0;
-  static bool get shouldWaitStart => DateTime.now().millisecondsSinceEpoch - lastStart < 15000;
+  static bool get shouldWaitStart => isWsaStartupPending(
+    startedAtMilliseconds: lastStart,
+    nowMilliseconds: DateTime.now().millisecondsSinceEpoch,
+  );
   static final DynamicTimer timer = DynamicTimer((Timer t) => WSAPeriodicConnector._checkConnectionStatus());
+
+  /// Starts a bounded fast-poll window as soon as PacMan successfully asks
+  /// Windows to launch WSA. This covers cold boots where WSA's VM and ADB
+  /// listener appear well after the launcher command returns.
+  static void notifyStartupRequested() {
+    lastStart = DateTime.now().millisecondsSinceEpoch;
+    timer.setDuration(PERIODIC_CHECK_BOOT_DURATION);
+    if (status != ConnectionStatus.STARTING) {
+      status = ConnectionStatus.STARTING;
+      GState.connectionStatus.$ = status.statusAlert;
+    }
+  }
   static ConnectionStatus status = ConnectionStatus.UNKNOWN;
   static WSAStatusAlert alertStatus = ConnectionStatus.UNKNOWN.statusAlert;
   static bool _statusInitialized = false;
@@ -144,20 +159,29 @@ class WSAPeriodicConnector {
 
     if (!WSAStatus.isBooted) {
       timer.setDuration(PERIODIC_CHECK_BOOT_DURATION);
-      ConnectionStatus newStatus = Env.WSA_INSTALLED ? ConnectionStatus.ARRESTED : WinVer.isWindows11OrGreater ? ConnectionStatus.MISSING : ConnectionStatus.UNSUPPORTED;
+      ConnectionStatus newStatus = shouldWaitStart
+          ? ConnectionStatus.STARTING
+          : Env.WSA_INSTALLED
+              ? ConnectionStatus.ARRESTED
+              : WinVer.isWindows11OrGreater
+                  ? ConnectionStatus.MISSING
+                  : ConnectionStatus.UNSUPPORTED;
       if (status != newStatus) GState.connectionStatus.$ = (status = newStatus).statusAlert;
       return;
     }
     else if (!WSAStatus.isRunning) {
       timer.setDuration(PERIODIC_CHECK_SLEEPING_DURATION);
-      ConnectionStatus newStatus = ConnectionStatus.ARRESTED;
+      ConnectionStatus newStatus = shouldWaitStart
+          ? ConnectionStatus.STARTING
+          : ConnectionStatus.ARRESTED;
       if (status != newStatus) GState.connectionStatus.$ = (status = newStatus).statusAlert;
       return;
     }
     else {
-      timer.setDuration(PERIODIC_CHECK_CONNECT_DURATION);
-      if (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.MISSING || status == ConnectionStatus.UNSUPPORTED)
-          lastStart = DateTime.now().millisecondsSinceEpoch;
+      if (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.MISSING || status == ConnectionStatus.UNSUPPORTED) {
+        lastStart = DateTime.now().millisecondsSinceEpoch;
+      }
+      timer.setDuration(wsaConnectionPollInterval(startupPending: shouldWaitStart));
     }
 
     final prevStatus = status;
@@ -188,6 +212,8 @@ class WSAPeriodicConnector {
         case 'device':
           GState.adbConnectionDiagnostic.update((_) => "");
           status = ConnectionStatus.CONNECTED;
+          lastStart = 0;
+          timer.setDuration(PERIODIC_CHECK_CONNECT_DURATION);
           break;
         case 'unauthorized':
           GState.adbConnectionDiagnostic.update((_) =>
@@ -273,6 +299,8 @@ class WSAPeriodicConnector {
     } else {
       GState.adbConnectionDiagnostic.update((_) => "");
       status = ConnectionStatus.CONNECTED;
+      lastStart = 0;
+      timer.setDuration(PERIODIC_CHECK_CONNECT_DURATION);
     }
   }
 }

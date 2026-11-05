@@ -163,4 +163,51 @@ void main() {
       );
     });
   });
+
+  group('WSA startup retry policy', () {
+    test('keeps fast retries during the first minute after startup', () {
+      expect(
+        isWsaStartupPending(
+          startedAtMilliseconds: 100000,
+          nowMilliseconds: 159999,
+        ),
+        isTrue,
+      );
+      expect(
+        wsaConnectionPollInterval(startupPending: true),
+        const Duration(seconds: 1),
+      );
+    });
+
+    test('returns to steady polling after the startup window', () {
+      expect(
+        isWsaStartupPending(
+          startedAtMilliseconds: 100000,
+          nowMilliseconds: 160000,
+        ),
+        isFalse,
+      );
+      expect(
+        wsaConnectionPollInterval(startupPending: false),
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('does not treat an unset or future startup timestamp as pending', () {
+      expect(
+        isWsaStartupPending(
+          startedAtMilliseconds: 0,
+          nowMilliseconds: 100000,
+        ),
+        isFalse,
+      );
+      expect(
+        isWsaStartupPending(
+          startedAtMilliseconds: 200000,
+          nowMilliseconds: 100000,
+        ),
+        isFalse,
+      );
+    });
+  });
 }
