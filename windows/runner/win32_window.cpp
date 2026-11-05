@@ -287,8 +287,22 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
   DWORD process_id = 0;
   if (!IsWsaAppWindow(window, &process_id)) return;
   const DWORD thread_id = GetWindowThreadProcessId(window, nullptr);
-  if (thread_id == 0 || wsa_thread_hooks_.count(thread_id) != 0 ||
-      failed_wsa_hook_threads_.count(thread_id) != 0) return;
+  if (thread_id == 0 || wsa_thread_hooks_.count(thread_id) != 0) return;
+
+  // A transient load/injection failure must not permanently disable a WSA
+  // thread. The scan timer retries after a short cooldown while WSA starts.
+  const ULONGLONG now = GetTickCount64();
+  const auto retry = wsa_hook_retry_after_.find(thread_id);
+  if (retry != wsa_hook_retry_after_.end()) {
+    if (now < retry->second) return;
+    wsa_hook_retry_after_.erase(retry);
+  }
+
+  std::wstringstream candidate_diagnostic;
+  candidate_diagnostic << L"Attempting per-app hooks for WsaClient window HWND="
+                       << window << L" PID=" << process_id
+                       << L" TID=" << thread_id;
+  AppendTrayDiagnostic(candidate_diagnostic.str());
 
   if (app_tray_hook_module_ == nullptr) {
     wchar_t path[32768] = {};
@@ -307,7 +321,7 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
       diagnostic << L"Could not load app tray hook DLL: " << dll_path
                  << L"; Win32 error=" << error;
       AppendTrayDiagnostic(diagnostic.str());
-      failed_wsa_hook_threads_.insert(thread_id);
+      wsa_hook_retry_after_[thread_id] = GetTickCount64() + 10000;
       OutputDebugStringW(L"WSA PacMan: per-app tray hook DLL could not be loaded.\n");
       return;
     }
@@ -322,8 +336,8 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
   const auto call_wnd_ret = reinterpret_cast<HOOKPROC>(
       GetProcAddress(app_tray_hook_module_, "WsaAppTrayCallWndRetProc"));
   if (!cbt || !get_message || !call_wnd || !call_wnd_ret) {
-    AppendTrayDiagnostic(L"App tray hook DLL exports are incomplete.");
-    failed_wsa_hook_threads_.insert(thread_id);
+    AppendTrayDiagnostic(L"App tray hook DLL exports are incomplete; retrying this WsaClient thread in 10 seconds.");
+    wsa_hook_retry_after_[thread_id] = GetTickCount64() + 10000;
     OutputDebugStringW(L"WSA PacMan: per-app tray hook DLL exports are incomplete.\n");
     return;
   }
@@ -366,10 +380,11 @@ void Win32Window::InstallWsaAppHookForWindow(HWND window) {
     if (hooks.get_message) UnhookWindowsHookEx(hooks.get_message);
     if (hooks.call_wnd) UnhookWindowsHookEx(hooks.call_wnd);
     if (hooks.call_wnd_ret) UnhookWindowsHookEx(hooks.call_wnd_ret);
-    failed_wsa_hook_threads_.insert(thread_id);
-    OutputDebugStringW(L"WSA PacMan: Windows rejected a per-app tray hook.\n");
+    wsa_hook_retry_after_[thread_id] = GetTickCount64() + 10000;
+    OutputDebugStringW(L"WSA PacMan: Windows rejected a per-app tray hook; retrying after cooldown.\n");
     return;
   }
+  wsa_hook_retry_after_.erase(thread_id);
   wsa_thread_hooks_.emplace(thread_id, hooks);
 }
 
@@ -413,7 +428,7 @@ void Win32Window::RemoveWsaAppHooks() {
     if (hooks.cbt) UnhookWindowsHookEx(hooks.cbt);
   }
   wsa_thread_hooks_.clear();
-  failed_wsa_hook_threads_.clear();
+  wsa_hook_retry_after_.clear();
   if (app_tray_hook_module_ != nullptr) {
     FreeLibrary(app_tray_hook_module_);
     app_tray_hook_module_ = nullptr;
