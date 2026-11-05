@@ -18,6 +18,9 @@ The default runtime choice is the upstream **NoGApps / NoAmazon** build. This om
 
 **Existing WSA installations are detected and left untouched.** The helper will not uninstall, replace or convert an existing Android environment. Back up `Userdata.vhdx` before manually changing a WSA distribution or architecture. The extracted WSA folder must remain on the PC after installation; the upstream [installation guide](https://github.com/MustardChef/WSABuilds/blob/master/Documentation/WSABuilds/Installation.md) explains why.
 
+On a **fresh WSA installation**, the runtime helper also enables **WSA Android Developer mode** automatically. It initializes the new user's `settings.dat` hive, saves a timestamped backup, then changes and verifies only the `DeveloperModeEnabled` value; it does not replace the whole settings hive or change Windows' separate Developer Mode setting. If the settings hive cannot be safely initialized or updated, WSA installation is kept intact and the helper prints the manual WSA Settings path. Existing registered WSA installations are not modified by this first-install step. Developer mode exposes WSA's ADB endpoint to devices on the same private network; the first ADB connection may still require approval in Android's debugging prompt. Choose **Always allow from this computer** only on a computer you trust.
+
+
 Microsoft ended official WSA support on 5 March 2025. These are community-maintained builds, not a Microsoft-supported Android subsystem. The latest available upstream LTS is still Android 13; this helper does not make Android 14/17 images available.
 
 ## Upgrade and file-lock handling
