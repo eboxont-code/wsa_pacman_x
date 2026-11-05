@@ -794,3 +794,10 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Static structural inspection confirms one complete instance of each expected function in the correct order and the fresh-install call after `Install-WsaFromFolder`.
 - 🔄 CI run #184, ID `41953560504`, commit `4f8d9a668dcd74480b8e94c190fe47f3f7b3becd`, is the first run against the repaired baseline. Its status is still in progress.
 - ⏳ No fresh WSA install or live settings.dat modification has been attempted. Existing WSA and Windows Grass installations remain untouched.
+
+
+### 2026-11-05 — PowerShell syntax now passes; CI static guard needs exact comment text
+- ✅ After restoring the clean installer baseline, CI run #184 (ID `41953560504`) passed the PowerShell parser stage and proceeded through function checks to the `requiredChecks` loop. This confirms the malformed function insertion/parser failure is fixed.
+- ❌ Run #184 stopped because the static guard expected the phrase `Do not replace the complete hive`, while the source comment split `Do not` and `replace` across two physical lines. This is a test-string mismatch, not a PowerShell syntax or C# compilation failure; the C# compile test had not run yet.
+- ✅ Changed the source comment so `Do not replace the complete hive` appears contiguously. No runtime logic changed.
+- 🔄 Next: rerun Windows CI; confirm the C# registry helper compiles, then full Windows package build completes.
