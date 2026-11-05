@@ -6,6 +6,7 @@ import 'package:wsa_pacman/global_state.dart';
 import 'package:wsa_pacman/main.dart';
 import 'package:wsa_pacman/windows/win_io.dart';
 import 'package:wsa_pacman/windows/win_pkg.dart';
+import 'wsa_settings_launcher.dart';
 import '../utils/string_utils.dart';
 import '../utils/regexp_utils.dart';
 
@@ -24,6 +25,47 @@ class WSAUtils {
   }
   static bool launchSettings() => launchApp("com.android.settings");
   static bool launchDeveloperSettings() => launch("/deeplink wsa-client://developer-settings");
+
+  /// Opens the installed Windows Subsystem for Android Settings app.
+  ///
+  /// Resolve its AUMID from the Start Apps catalog instead of hard-coding a
+  /// version-specific application ID. This only opens Settings; it does not
+  /// modify Developer Mode or any Android debugging preference.
+  static bool launchWsaSettings() {
+    const command = r"""
+$entries = @(Get-StartApps | Where-Object {
+  $_.AppID -like 'MicrosoftCorporationII.WindowsSubsystemForAndroid_*!*'
+})
+$entry = $entries | Where-Object { $_.Name -match '(?i)settings' } | Select-Object -First 1
+if (-not $entry -and $entries.Count -eq 1) { $entry = $entries[0] }
+if ($entry) {
+  [Console]::Out.Write($entry.AppID)
+  exit 0
+}
+exit 2
+""";
+
+    try {
+      final result = Process.runSync(
+        Env.POWERSHELL,
+        [
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          command,
+        ],
+      );
+      if (result.exitCode != 0) return false;
+
+      final appId = parseWsaSettingsAppId(result.stdout?.toString() ?? '');
+      if (appId == null) return false;
+
+      return WinIO.run(ShellOp.OPEN, "shell:AppsFolder\\$appId", null);
+    } catch (_) {
+      return false;
+    }
+  }
   static bool launchSystem() => launchApp("android.system");
   static bool shutdown() => launch("/shutdown");
   static bool modifyApp(String package) => launch("/modify $package");
