@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Strengthen per-Android-app close interception** — user tested the diagnostic build and reports that no app tray icon is created. Add a queued-message fallback for `WM_CLOSE` and `SC_CLOSE` in the injected WSA app-thread hook, with diagnostics and CI source guards. Keep PacMan manager behavior unchanged; then rebuild an EXE installer and portable package.
+- ⏳ **Live WSA verification of each Android app's X-to-tray behavior** — second queued-close interception build passed Windows CI and a verified EXE installer is ready. Need a live WSA test to confirm queued `WM_CLOSE`/`SC_CLOSE` interception, hook execution inside WsaClient, per-app NIM_ADD, one-app-only hide/restore, and background activity.
 
 ## Project goal
 
@@ -921,3 +921,14 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ Verified the portable ZIP contains `WsaPacManAppTrayHook.dll`, `WSA-pacman.exe`, and `flutter_windows.dll`.
 - ⚠️ Runtime result remains unverified. Need a test against a live WSA Android app and the diagnostic log before claiming X interception works for all app windows.
 - ⏳ Next: test the diagnostic portable manager alongside the already-installed Android apps; click X on one app; confirm only that app hides and gets its own tray icon; restore it; then share `%TEMP%\WsaPacMan-AppTray-Diagnostics.log` if it still closes or no tray icon appears.
+
+### 2026-11-05 — Second per-app close interception build passed
+- ✅ Added queued `WM_CLOSE` and queued `WM_SYSCOMMAND/SC_CLOSE` interception to the injected `WH_GETMESSAGE` hook. When per-app `NIM_ADD` succeeds, the queued close is replaced with `WM_NULL` before WsaClient dispatches it.
+- ✅ Changed in-DLL WSA process identification to verify the current injected process using `GetModuleFileNameW(nullptr)` and ensure the HWND PID equals the current PID. This avoids reopening a packaged WSA process with `OpenProcess` from inside itself.
+- ✅ Added diagnostics for queued close detection, whether it was converted to a tray hide, and the Win32 error code when `Shell_NotifyIconW(NIM_ADD)` fails.
+- ✅ Added CI source guards for the new queued-close interception and in-process WsaClient identity checks.
+- ✅ Windows CI run #? (run ID `42014461242`, commit `691667b34623e121812c769bbeccbc8ff29e4ffb`) passed validation, Windows compile, portable packaging, Inno Setup EXE build, and artifact upload.
+- ✅ GitHub artifact ID `13409006455`; outer ZIP size `53,858,861` bytes; GitHub SHA-256 `480474caa6fab6f87c03b2b4e5b2a5cdfb4ce1b92dd4f6e12e8a39a414765479`; expires `2026-11-19T10:56:55Z`.
+- ✅ Extracted Windows installer `WSA-pacman-universal-v1.5.0-installer.exe`, size `37,105,173` bytes; SHA-256 `15926d9283f98aedeea54d477571fa7138fa05a86462bba366e2a5869eab0988`.
+- ✅ Verified portable package includes `WsaPacManAppTrayHook.dll`; verified Inno Setup includes all files under the release directory.
+- ⚠️ Windows CI/build success does not prove live hook injection or per-app tray behaviour. Need user runtime test and `%TEMP%\\WsaPacMan-AppTray-Diagnostics.log` if icons still fail.
