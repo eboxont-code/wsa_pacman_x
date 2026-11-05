@@ -56,5 +56,18 @@ void main() {
         expect(error.toString(), contains('no output'));
       }
     });
+    test('quotes remote paths containing spaces', () {
+      expect(
+        quoteAdbShellArgument('Android/data/my app'),
+        "'Android/data/my app'",
+      );
+    });
+
+    test('escapes apostrophes in remote paths', () {
+      expect(
+        quoteAdbShellArgument("user's folder"),
+        "'user'\\''s folder'",
+      );
+    });
   });
 }
