@@ -41,6 +41,9 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Test XAPK ADB resource command handling
+        run: flutter test test/adb_operation_test.dart
+
       - name: Validate WSA runtime checks and installer defaults
         shell: pwsh
         run: |
