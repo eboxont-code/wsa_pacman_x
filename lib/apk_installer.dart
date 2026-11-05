@@ -9,6 +9,7 @@ import 'package:wsa_pacman/android/reader_apk.dart';
 import 'package:wsa_pacman/global_state.dart';
 import 'package:wsa_pacman/main.dart';
 import 'package:wsa_pacman/utils/wsa_utils.dart';
+import 'package:wsa_pacman/utils/install_flow.dart';
 import 'package:wsa_pacman/widget/smooth_list_view.dart';
 import 'package:wsa_pacman/widget/themed_pane_item.dart';
 import 'package:wsa_pacman/windows/win_io.dart';
@@ -86,7 +87,7 @@ class _ApkInstallerState extends State<ApkInstaller> {
     WSAStatusAlert connectionStatus = GState.connectionStatus.of(context);
     bool isConnected = connectionStatus.isConnected;
     InstallType? installType = GState.apkInstallType.of(context);
-    bool canInstall = isConnected && installType != null && installType != InstallType.UNKNOWN;
+    bool canInstall = canInstallPackage(isConnected: isConnected, hasKnownInstallType: installType != null && installType != InstallType.UNKNOWN);
     InstallState installState = GState.apkInstallState.of(context);
     final mica = GState.mica.of(context);
     final theme = FluentTheme.of(context);
@@ -94,8 +95,12 @@ class _ApkInstallerState extends State<ApkInstaller> {
     // Opening an APK/XAPK directly must be a complete install flow on a
     // fresh PacMan install too. Do not make WSA startup depend on the manager's
     // persisted "Autostart WSA" preference in install mode.
-    final shouldAutoLaunchWSA = !_autoLaunchAttempted && !isConnected &&
-        (Constants.installMode || GState.autostartWSA.of(context));
+    final shouldAutoLaunchWSA = shouldAutoLaunchWsa(
+      launchAlreadyAttempted: _autoLaunchAttempted,
+      isConnected: isConnected,
+      installMode: Constants.installMode,
+      autoStartPreference: GState.autostartWSA.of(context),
+    );
 
     if (shouldAutoLaunchWSA) {
       _autoLaunchAttempted = true;
