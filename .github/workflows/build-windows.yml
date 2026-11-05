@@ -189,11 +189,12 @@ jobs:
               throw "Required WSA PacMan uninstall behavior is missing: $check"
             }
           }
-          if ($installerText -notmatch "(?s)\\[UninstallDelete\\](.*?)(?:\\r?\\n\\[|$)") {
-            throw "The installer must define an UninstallDelete section"
+          $uninstallCleanupEntries = @($installerText -split "`n" | Where-Object { $_ -match "^Type: filesandordirs;" })
+          if ($uninstallCleanupEntries.Count -lt 3) {
+            throw "The installer must clean the app directory and both PacMan settings directories"
           }
-          $uninstallDeleteSection = $Matches[1]
-          if ($uninstallDeleteSection -match '(?im)^\\s*Type:\\s*filesandordirs;\\s*Name:\\s*"[^"]*(?:WSABuilds|ProgramData)') {
+          if (($uninstallCleanupEntries -join "`n").Contains("WSABuilds") -or
+              ($uninstallCleanupEntries -join "`n").Contains("ProgramData")) {
             throw "Uninstall must not delete the separately installed WSA runtime under ProgramData"
           }
           if ($installerText -notmatch "Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime") {
