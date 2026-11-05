@@ -31,7 +31,7 @@
 
 ## Current task
 
-- 🔄 **Diagnose WSA Android runtime startup hang** — user confirms Developer mode is ON, but WSA Settings > Files remains loading and never opens. ADB currently has no connected device. Investigate startup logs and runtime state before attempting Grass launch. Do not touch the separate Windows Grass desktop app.
+- 🔄 **Collect WSA startup event logs and current Developer-page endpoint** — Developer mode is ON, but WSA Settings > Files remains stuck loading and ADB has no attached device. Do not assume `127.0.0.1:58526` is still current; use the address/port shown on the WSA Developer page when available. Identify relevant WSA event channels and recent errors. Do not launch Grass until Android is reachable; do not touch the separate Windows Grass desktop app.
 
 ## Project goal
 
@@ -342,3 +342,12 @@ Expected evidence to capture: Android boot-completed value, whether `pm path` re
 - ✅ This is an additional failure beyond the Grass APK launch: WSA itself is not completing the normal Android Files/startup path, while ADB has no attached device.
 - ⚠️ Do not assume Grass is the cause; APK launch remains unattempted.
 - 🔄 Current task: diagnose WSA startup/runtime using read-only Windows event-channel and WSA process/service evidence. Do not uninstall/reinstall WSA or alter either Grass installation.
+
+
+### 2026-11-05 — Developer mode confirmed ON; Files remains stuck loading
+- ✅ User confirms WSA Developer mode is ON.
+- ❌ User reports WSA Settings > Files is taking a very long time and still has not loaded.
+- ⚠️ ADB currently has no attached device, while WSA Windows service/client/VM processes have been observed running. This points to an Android subsystem startup/connectivity problem; it is not yet evidence of a Grass APK fault.
+- ✅ Research checked the WSABuilds ADB guide: connect using the IP address and port actually shown in WSA Developer settings; do not assume a previous endpoint remains current. Source: https://github.com/MustardChef/WSABuilds/blob/master/MagiskOnWSA/docs/Guides/ADB-Sideloading.md
+- ✅ WSA-Sideloader usage guide advises checking/allowing the ADB authorization prompt and notes that Developer mode can be toggled off/on to recover a failed ADB connection. Source: https://github.com/MustardChef/WSABuilds/blob/master/Documentation/Usage%20Guides/Sideloading%20Guides/WSA-Sideloader.md
+- 🔄 Next: enumerate Windows event channels related to WSA/Android/Hyper-V and inspect recent errors; also read the current IP/port displayed on the WSA Developer page if it becomes available. No Grass launch attempt yet.
