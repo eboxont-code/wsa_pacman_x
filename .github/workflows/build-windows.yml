@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/generic-android-vpn-management # Temporary PR verification; remove before merge.
   pull_request:
     branches:
       - main
