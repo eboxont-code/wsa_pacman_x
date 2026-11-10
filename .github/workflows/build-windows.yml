@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - chore/clean-repository-and-integrate-apk-recovery
   pull_request:
     branches:
       - main
@@ -212,7 +213,8 @@ jobs:
 
           $pubspecVersion = [regex]::Match((Get-Content "pubspec.yaml" -Raw), '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)').Groups[1].Value
           $appVersion = [regex]::Match((Get-Content "lib/main.dart" -Raw), "const String appVersion = '([^']+)'").Groups[1].Value
-          $installerVersion = [regex]::Match($installerText, '(?m)^AppVersion=([0-9]+\.[0-9]+\.[0-9]+)\r?
+          $installerVersionLine = (Select-String -Path "installer/installer.iss" -Pattern '^AppVersion=' | Select-Object -First 1).Line
+          $installerVersion = if ($installerVersionLine) { $installerVersionLine -replace '^AppVersion=', '' } else { '' }
           if (-not $pubspecVersion -or $pubspecVersion -ne $appVersion -or $appVersion -ne $installerVersion) {
             throw "Application, package and installer versions must match (including CRLF files). pubspec=$pubspecVersion app=$appVersion installer=$installerVersion"
           }
