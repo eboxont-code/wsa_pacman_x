@@ -3,14 +3,7 @@ name: Build WSA PacMan for Windows
 on:
   push:
     branches:
-      - custom/white-ui
-      - wsa/auto-architecture-runtime
-      - wsa/auto-prerequisite-repair
-      - wsa/virtualization-diagnostics
-      - wsa/automatic-runtime-resume
-      - wsa/tray-background-silent-install
-      - wsa/stop-bundled-adb-before-upgrade
-      - wsa/minimize-android-workspace-with-pacman
+      - main
   pull_request:
     branches:
       - main
@@ -41,6 +34,8 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Run all automated tests
+        run: flutter test
 
       - name: Validate WSA runtime checks and installer defaults
         shell: pwsh
@@ -188,6 +183,39 @@ jobs:
           }
 
           $installerText = Get-Content "installer/installer.iss" -Raw
+
+          $requiredUninstallSettings = @(
+            "Uninstallable=yes",
+            "CreateUninstallRegKey=yes",
+            "UninstallDisplayName=WSA PacMan",
+            'Name: "{group}\Uninstall WSA PacMan"; Filename: "{uninstallexe}"',
+            'Type: filesandordirs; Name: "{%USERPROFILE}\.wsa-pacman"',
+            'Type: filesandordirs; Name: "{%USERPROFILE}\.wsamanager"'
+          )
+          foreach ($check in $requiredUninstallSettings) {
+            if (-not $installerText.Contains($check)) {
+              throw "Required WSA PacMan uninstall behavior is missing: $check"
+            }
+          }
+          $uninstallCleanupEntries = @($installerText -split '\r?\n' | Where-Object { $_ -match "^Type: filesandordirs;" })
+          if ($uninstallCleanupEntries.Count -lt 2) {
+            throw "The installer must clean both PacMan settings directories"
+          }
+          $unsafeInstallCleanup = @($uninstallCleanupEntries | Where-Object { $_.Contains("{app}") -and $_.Contains("*") })
+          if ($unsafeInstallCleanup.Count -gt 0) {
+            throw "Do not wildcard-delete the install directory; Inno tracks and removes installed files itself"
+          }
+          $cleanupText = $uninstallCleanupEntries -join [Environment]::NewLine
+          if ($cleanupText.Contains("WSABuilds") -or $cleanupText.Contains("ProgramData")) {
+            throw "Uninstall must not delete the separately installed WSA runtime under ProgramData"
+          }
+
+          $pubspecVersion = [regex]::Match((Get-Content "pubspec.yaml" -Raw), '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)').Groups[1].Value
+          $appVersion = [regex]::Match((Get-Content "lib/main.dart" -Raw), "const String appVersion = '([^']+)'").Groups[1].Value
+          $installerVersion = [regex]::Match($installerText, '(?m)^AppVersion=([0-9]+\.[0-9]+\.[0-9]+)$').Groups[1].Value
+          if (-not $pubspecVersion -or $pubspecVersion -ne $appVersion -or $appVersion -ne $installerVersion) {
+            throw "Application, package and installer versions must match. pubspec=$pubspecVersion app=$appVersion installer=$installerVersion"
+          }
           if ($installerText -notmatch "Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime") {
             throw "The Android runtime helper must run hidden and finish before installer completion"
           }
