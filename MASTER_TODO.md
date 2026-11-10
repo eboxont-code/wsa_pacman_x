@@ -28,6 +28,10 @@ This file is the single project task register. Keep it concise, current and evid
 - [ ] Verify notification-area hide/restore behaviour on supported Windows builds, including Explorer restarting and an unavailable tray icon.
 - [ ] Verify the ADB endpoint discovery does not adopt a phone or unrelated emulator and does not guess when multiple WSA instances are ambiguous.
 - [ ] Keep diagnostics concise and local by default. Never log passwords, firmware credentials, recovery keys or authentication tokens.
+- [ ] Expand generic Android VPN support: detect installed apps declaring `android.net.VpnService`, provide safe launch paths for newly installed clients, and report VPN state only when it can be verified without relying on fragile parsing.
+- [ ] Verify the Android system VPN settings shortcut and first-use consent with multiple VPN providers on supported WSA builds. Confirm starting a second VPN stops the prior service as Android specifies.
+- [ ] Add clear UI status and recovery guidance for incompatible VPN providers or network modes; do not silently toggle Local network access or Windows networking.
+- [ ] Keep Android/WSA VPN scope separate from host-wide Windows VPN support. Add a Windows VPN hand-off only as a separately labelled integration if requested.
 
 ## Priority 2 — Release readiness
 
