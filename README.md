@@ -1,95 +1,110 @@
-# wsa_pacman
+# WSA PacMan
 
-![Installer](README/screenshots/installer.png?raw=true "Installer")
+![WSA PacMan installer](README/screenshots/installer.png)
 
-A GUI package manager and package installer for Windows Subsystem for Android (WSA).
+**WSA PacMan** is a Windows desktop package manager and installer for the Windows Subsystem for Android (WSA). It installs APK and XAPK files, displays package information and permissions, and supports application upgrades and downgrades.
 
-Currently provides a double-click GUI installer for .apk and .xapk files that shows app information (package, icon, version and permissions), allows normal installations as well as upgrades and downgrades.
+## Features
 
-The app additionally provides a button to open Android settings and one to open the "Manage Applications" Android settings page, from which you can uninstall or disable applications and grant or revoke permissions
+- Open APK and XAPK files directly with WSA PacMan.
+- Inspect package name, app icon, version and Android permissions before installation.
+- Install, upgrade, reinstall and downgrade Android applications.
+- Open Android Settings and the Manage Applications screen.
+- Show WSA and ADB connection state, with useful offline and authorization diagnostics.
+- Start WSA for direct APK installs, identify a unique WSA ADB endpoint when available, and guide users through Developer mode, USB debugging and reconnect steps.
+- Keep the main manager in the Windows notification area and hide/restore the Android workspace without stopping Android apps.
+- Use the bundled ADB, AAPT, AAPT2 and AXML tools; separate Android platform-tools downloads are not required.
 
-## Project plan and requirements
+## Windows installer and WSA runtime setup
 
-- [Master task register](MASTER_TODO.md) — implementation queue, priorities, verification and release tasks.
-- [WSA prerequisite automation specification](docs/WSA_PREREQUISITE_AUTOMATION_SPEC.md) — complete requirements for Windows feature repair, firmware detection, manufacturer-aware guidance, safe vendor support, restart recovery and Android data protection.
+The Windows installer includes an optional **Install matching WSA Android runtime** task, selected by default. It can download the matching community-maintained WSA build for the PC's native architecture, verify the published SHA-256 digest, and run the upstream installation process.
 
-## Self-contained Windows setup
+The helper checks Windows edition/build, CPU architecture, hardware virtualization, memory, system-drive space and file system. It can automatically enable the Windows **Virtual Machine Platform** and **Windows Hypervisor Platform** features. If a restart is required, it records a one-time continuation and checks the system again after the next sign-in. PacMan does not force-restart Windows.
 
-The Windows installer and portable package include the helper programs WSA PacMan uses (ADB, AAPT, AAPT2 and AXML decoding tools). The installer also carries the Microsoft Visual C++ x64 Redistributable and installs it automatically only when a suitable version is not already present. **You do not need to download Android platform-tools, ADB or the Visual C++ runtime separately.**
+**Firmware virtualization must already be enabled in BIOS/UEFI.** Windows applications do not have a universal, vendor-neutral way to switch Intel VT-x/VMX or AMD-V/SVM on every PC. PacMan detects the available signals and guides the user when firmware action is needed; it does not silently change unrelated firmware or security settings.
 
-The installer also includes an **Install matching WSA Android runtime** helper. The runtime setup task is selected by default. It detects the PC's native architecture and Windows version, checks Windows edition/build, RAM, system-drive free space and NTFS, checks firmware virtualization, and inspects both required Windows virtualization features. When Virtual Machine Platform or Windows Hypervisor Platform is disabled, the elevated helper enables it and registers a one-time automatic continuation for your next Windows sign-in. You do not have to reopen the Start-menu shortcut after restarting. The helper can select Windows 11 x64, Windows 11 ARM64, or Windows 10 x64. PowerShell and the elevated child setup run hidden, and the installer waits for that elevated setup to finish. PacMan bypasses the upstream Run.bat launcher (which otherwise opens a separate visible PowerShell window) and invokes a temporary unattended copy of upstream Install.ps1 directly. The original verified upstream script is not edited, keypress waits are removed only from the temporary copy, and stdout/stderr logs are saved under %ProgramData%\WSABuilds\Logs. A silent Inno Setup installation can be started with `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`; the selected runtime task still runs in that mode. Windows UAC and any required Windows/firmware confirmation remain under your control. The helper never force-restarts the PC.
+The default runtime variant is **NoGApps / NoAmazon**. It does not include Google Play Services, Google Play Store or Amazon Appstore. Some Android apps that depend on Google Play Services may therefore have limited functionality.
 
-The default runtime choice is the upstream **NoGApps / NoAmazon** build. This omits Google Play Services/Store and Amazon Appstore; apps can still be installed with WSA PacMan by sideloading APKs. The WSABuilds project currently warns about crashes in Google Apps builds on Windows 11, so this helper avoids that variant by default. The WSA archive is downloaded directly from the upstream [WSABuilds releases](https://github.com/MustardChef/WSABuilds/releases), not re-hosted in this project. Expect a roughly 475–555 MB download, at least 10 GB free on the Windows system drive, NTFS storage and 8 GB RAM minimum. The helper automatically enables the two Windows virtualization features if needed. Firmware virtualization (Intel VT-x / AMD-V / SVM) must already be enabled in BIOS/UEFI; a normal Windows application cannot safely change that firmware setting.
+**Existing WSA installations are detected and left untouched.** The prerequisite check runs for existing installations too, but PacMan does not uninstall, convert, reset or replace an existing Android environment as part of prerequisite repair. Back up `Userdata.vhdx` before manually changing an existing WSA distribution or architecture.
 
-**Existing WSA installations are detected and left untouched.** The helper will not uninstall, replace or convert an existing Android environment. Before returning, it still checks the Windows virtualization prerequisites and automatically enables missing **Virtual Machine Platform** and **Windows Hypervisor Platform** features. If Windows requires a restart, the helper schedules its one-time continuation. Back up `Userdata.vhdx` before manually changing a WSA distribution or architecture. The extracted WSA folder must remain on the PC after installation; the upstream [installation guide](https://github.com/MustardChef/WSABuilds/blob/master/Documentation/WSABuilds/Installation.md) explains why.
+Microsoft ended official WSA support on 5 March 2025. WSA builds installed by this helper are community-maintained and are not supported by Microsoft.
 
-Microsoft ended official WSA support on 5 March 2025. These are community-maintained builds, not a Microsoft-supported Android subsystem. The latest available upstream LTS is still Android 13; this helper does not make Android 14/17 images available.
+## Supported Windows configurations
 
-## Upgrade and file-lock handling
+The current runtime helper targets:
 
-Before replacing an existing installation, Setup checks whether the old bundled `embedded-tools\adb.exe` is still running. It stops that ADB server only when Windows reports that the process image path exactly matches this WSA PacMan installation. It does not terminate unrelated ADB servers from Android Studio, SDK platform-tools, or other emulators. If the matching process cannot be stopped, Setup stops with a clear error instead of skipping or partially replacing the locked file.
+- **Windows 10 22H2 x64**, build 19045.2311 or later.
+- **Windows 11 x64**, build 22000.526 or later.
+- **Windows 11 ARM64**, using Windows' built-in x64 application emulation and an ARM64-matched WSA image.
 
-## Background operation and sign-in compatibility
+Windows 10 ARM64 and 32-bit Windows are not supported by this package. The selected WSA image must match the PC's native CPU architecture.
 
-On Windows, closing the main WSA PacMan window with the red **X** or using its minimize button hides the manager in the notification area instead of terminating it. At the same time, PacMan hides the visible Android app windows owned by the installed `WsaClient.exe` process, while leaving their Android processes and the WSA runtime running. Android app windows opened after the workspace has been hidden are left alone until the next hide action. Left-click the tray icon or choose **Show Android workspace** to restore the PacMan manager and the Android windows to their saved window placements. Windows the user had already hidden are not reopened. Choosing **Exit WSA PacMan** restores any Android windows hidden by PacMan and then exits the manager; it does not shut down WSA or kill Android apps. Launching an Android app from the main PacMan manager hides only PacMan (not the newly launched app), so the app remains visible and usable. A user-initiated minimize or red-X action hides the whole Android workspace. Temporary APK/XAPK file-association installer windows keep their normal close behavior and do not add extra tray icons.
+The runtime helper currently documents a minimum of 8 GB RAM, NTFS on the Windows system drive and at least 10 GB of free system-drive space. WSA also requires usable hardware virtualization.
 
-The selected NoGApps runtime does **not** include Google Play Services. Some Android apps use Google's native sign-in SDKs or other Google Play Services APIs; those flows may fail even when the browser itself opens. Google's Android documentation lists verified App Links as available on devices with Google services installed, while normal user-managed deep links work on all devices. That means an HTTPS sign-in callback may remain in Chrome under NoGApps; a custom-scheme callback still needs the Android app to declare and handle the matching intent filter. Google also prohibits OAuth authorization in an app-controlled embedded browser, so a sign-in implementation that uses an embedded WebView can be rejected. WSA PacMan is a package manager and cannot safely invent or repair an OAuth callback for arbitrary third-party apps. See the Android [App Links](https://developer.android.com/training/app-links/about) and [deep-link](https://developer.android.com/training/app-links/create-deeplinks) documentation, and Google's [OAuth 2.0 policies](https://developers.google.com/identity/protocols/oauth2/policies). WSABuilds currently warns that its GApps variants have been crashing on Windows 11, so switching to a GApps image is not a safe general fix. The affected Android app and its sign-in method must be checked individually.
+## Download and install
 
-## Windows architecture compatibility
+The repository's Windows workflow produces two build artifacts:
 
-The same PacMan installer is designed for:
-- **Windows 10/11 on Intel or AMD x64 PCs** (the WSA runtime helper supports Windows 10 22H2 build 19045.2311+ and Windows 11 build 22000.526+).
-- **Windows 11 on ARM64 PCs** (including Snapdragon systems), using Windows' built-in x64 app emulation.
+- `WSA-pacman-universal-v1.5.0-installer.exe` — Windows installer.
+- `WSA-PacMan-portable-universal.zip` — portable package.
 
-The application and bundled ADB/AAPT/AAPT2/AXML helper programs are x64 binaries, not native ARM64 binaries. Windows 11 on ARM can run them through its built-in x64 emulation; no separate emulator download is needed. Windows 10 on ARM and 32-bit Windows are not supported by this package.
+Open [GitHub Actions — Build WSA PacMan for Windows](https://github.com/eboxont-code/wsa_pacman_x/actions/workflows/build-windows.yml), select the latest successful run, and download the artifacts. Workflow artifacts are temporary and retained for 14 days; they are build outputs, not permanent GitHub Releases.
 
-The WSA helper selects an Android system image that matches the PC's native CPU architecture. An x64 WSA image cannot be installed on an ARM64 Windows host, or vice versa. If an existing WSA installation is present, the helper leaves it alone rather than risk user data.
+During installation, leave **Install the matching WSA Android runtime** selected only when you want the helper to install a community WSA runtime. If WSA is already installed, the helper checks prerequisites and leaves the existing registration and Android data alone.
+
+### WSA connection setup
+
+After WSA is running, open WSA Settings and enable **Developer mode**. In the Android Developer options, enable **USB debugging** and approve the Android authorization prompt when Windows/Android displays it. These Android security prompts are intentionally user-controlled; PacMan cannot approve them silently.
+
+### Uninstalling PacMan
+
+Use **Start → WSA PacMan → Uninstall WSA PacMan**. The uninstaller removes the files installed by PacMan and this user's PacMan settings folders. It does **not** remove the separately installed WSA runtime under `%ProgramData%\WSABuilds`, or uninstall Android apps or delete Android user data.
 
 ## Settings
 
-- Appearance
-  - Fixed white/light interface (dark mode and window transparency controls removed)
-- Android port
-  - Default: 58526
-- Autostart WSA
-  - on/off
-- Install timeout
-- Language
-  - [All options](./locale/)
+The application includes settings for:
 
-<details><summary><ruby><p></ruby>
+- Appearance (fixed white/light interface).
+- Android connection port (default: `58526`).
+- WSA autostart preference.
+- APK installation timeout.
+- Interface language.
 
-## FAQ 
-</p></summary>
+## Build from source
 
-  **Q:** WSA PacMan is always showing the Offline status, why is that?
+The project is a Flutter Windows desktop application. The supported CI toolchain currently uses **Flutter 3.3.9**.
 
-  **A:** First things first make sure WSA is installed (duh); Open the 'Windows Subsystem for Android&#8482; Settings' app, in the Developer tab and make sure the 'Developer mode' switch is enabled; inside manage developer settings, make sure the 'USB debugging' option is enabled.
+From the repository root:
 
-  Should all of the above fail, [try following this procedure](https://github.com/alesimula/wsa_pacman/issues/99#issuecomment-1288141314); make sure to check the 'always allow' option.
-  ##
-  
-  **Q:** Can I use WSA PacMan on older versions of Windows (eg. Windows 10)?
+```sh
+flutter config --enable-windows-desktop
+flutter pub get
+flutter test
+flutter build windows --release
+```
 
-  **A:** WSA PacMan depends on Windows Subsystem for Linux, which is only ***officially*** supported on Windows 11.
+The Windows workflow also validates the PowerShell runtime helper and installer safety checks, stages the bundled tools, creates the portable ZIP, and compiles the Inno Setup installer.
 
-  However, you may be able to install WSA on Windows 10 [using this project](https://github.com/JimDude7404/WSA-Windows-10) by JimDude7404 and following the step-by-step guide on the GitHub page.
-  ##
+## Repository documentation
 
-  **Q:** Can i install the Play Store?
+- [Master task register](MASTER_TODO.md) — current priorities, completed work and verification gates.
+- [WSA prerequisite automation specification](docs/WSA_PREREQUISITE_AUTOMATION_SPEC.md) — Windows prerequisites, firmware safety, restart recovery and Android data protection requirements.
+- [Repository structure](docs/REPOSITORY_STRUCTURE.md) — what belongs in each directory and which assets are intentionally tracked.
+- [Contributing guide](CONTRIBUTING.md) — local checks, branch and pull request standards.
+- [Security policy](SECURITY.md) — how to report a vulnerability privately.
 
-  **A:** The play store is not _officially_ supported on WSA, and at the moment it is only possible to install it using an unofficial WSA build. I recommend installing the [Aurora Store](https://auroraoss.com/) instead, which is an unofficial Play Store client; but if you really want the Play Store and other Google apps, [check out this project](https://github.com/LSPosed/MagiskOnWSALocal).
+## Screenshots
 
-</details>
+<details>
+<summary>More screenshots</summary>
 
-<details><summary><ruby><p></ruby>
-  
-## More screenshots
-  </p></summary>
+![Main screen](README/screenshots/main_screen.png)
 
-  ![Installing](README/screenshots/installing.png?raw=true "Installing")
-  ![Installed](README/screenshots/installed.png?raw=true "Installed")
-  ![Downgrade](README/screenshots/downgrade.png?raw=true "Downgrade")
-  ![Main screen](README/screenshots/main_screen.png?raw=true "Main screen")
-  ![Settings](README/screenshots/settings_screen.png?raw=true "Settings")
+![Installing an APK](README/screenshots/installing.png)
+
+![Installed applications](README/screenshots/installed.png)
+
+![Downgrade flow](README/screenshots/downgrade.png)
+
+![Settings](README/screenshots/settings_screen.png)
 </details>
