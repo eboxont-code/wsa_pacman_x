@@ -55,6 +55,8 @@
     "wsa_manage": "Android Management",
     "wsa_manage_app": "Manage Applications",
     "wsa_manage_settings": "Manage Settings",
+    "wsa_manage_vpn": "Manage VPN connections",
+    "wsa_vpn_scope_note": "Use compatible Android VPN apps installed in WSA. Open a VPN app and choose Connect; Android will ask you to approve it the first time. Only one VPN service can be active for this Android user at a time. This protects Android apps inside WSA, not Windows desktop traffic. Compatibility varies by VPN app and WSA networking mode.",
 
     
     "settings_port": "WSA Port",
