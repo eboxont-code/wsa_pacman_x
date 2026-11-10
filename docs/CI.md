@@ -14,7 +14,7 @@ The project uses the **Build WSA PacMan for Windows** GitHub Actions workflow at
 2. Resolves the locked Flutter dependencies.
 3. Runs the complete Flutter test suite with `flutter test`.
 4. Parses the WSA runtime PowerShell helper and checks required prerequisite, elevation, restart/resume and existing-WSA safety behaviour.
-5. Checks that the PacMan installer preserves the separate WSA runtime, cleans only PacMan-owned settings, provides a proper uninstaller and matches the application/package version.
+5. Checks that the PacMan installer preserves the separate WSA runtime, cleans only PacMan-owned settings, provides a proper uninstaller, offers a preselected **Launch WSA PacMan** Finish-page checkbox, and matches the package/app/installer/native Windows executable versions.
 6. Builds the Windows desktop application.
 7. Runs targeted XAPK ADB resource-copy tests.
 8. Verifies the required bundled tools and stages the portable package.
