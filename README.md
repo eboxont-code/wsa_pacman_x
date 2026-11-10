@@ -50,7 +50,7 @@ The repository's Windows workflow produces two build artifacts:
 
 Open [GitHub Actions — Build WSA PacMan for Windows](https://github.com/eboxont-code/wsa_pacman_x/actions/workflows/build-windows.yml), select the latest successful run, and download the artifacts. Workflow artifacts are temporary and retained for 14 days; they are build outputs, not permanent GitHub Releases.
 
-During installation, leave **Install the matching WSA Android runtime** selected only when you want the helper to install a community WSA runtime. If WSA is already installed, the helper checks prerequisites and leaves the existing registration and Android data alone.
+During installation, leave **Install the matching WSA Android runtime** selected only when you want the helper to install a community WSA runtime. If WSA is already installed, the helper checks prerequisites and leaves the existing registration and Android data alone. On the final Setup Wizard page, **Launch WSA PacMan** is selected by default; clear that checkbox to finish without opening the app.
 
 ### WSA connection setup
 

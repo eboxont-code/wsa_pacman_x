@@ -82,6 +82,7 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
   Parameters: "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File ""{app}\wsa-runtime\Install-WSA.ps1"""; \
   WorkingDir: "{app}\wsa-runtime"; \
   Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime
+Filename: "{app}\{#executable}"; Description: "Launch WSA PacMan"; Flags: postinstall nowait skipifsilent; Check: FileExists(ExpandConstant('{app}\{#executable}'))
 
 [Icons]
 Name: "{group}\WSA PacMan"; Filename: "{app}\{#executable}"
