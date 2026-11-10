@@ -28,13 +28,11 @@ This file is the single project task register. Keep it concise, current and evid
 - [ ] Verify notification-area hide/restore behaviour on supported Windows builds, including Explorer restarting and an unavailable tray icon.
 - [ ] Verify the ADB endpoint discovery does not adopt a phone or unrelated emulator and does not guess when multiple WSA instances are ambiguous.
 - [ ] Keep diagnostics concise and local by default. Never log passwords, firmware credentials, recovery keys or authentication tokens.
-- [x] Add provider-neutral Android VPN service discovery and launch on the WSA management page. Full provider compatibility and multi-client real-WSA verification remain outstanding.
-- [ ] Verify the Android system VPN settings shortcut and first-use consent with multiple VPN providers on supported WSA builds. Confirm starting a second VPN stops the prior service as Android specifies.
+- [x] **Generic Android VPN management.** Discover Android services declaring `android.net.VpnService`, list their packages, launch the selected provider app and open Android VPN settings with a fallback. This feature is WSA/Android-only; Windows desktop VPN support is out of scope. [PR #29](https://github.com/eboxont-code/wsa_pacman_x/pull/29); all tests and Windows packaging passed in [build #311](https://github.com/eboxont-code/wsa_pacman_x/actions/runs/42829022549).
 - [ ] Verify provider discovery, launch and system VPN settings against multiple compatible VPN clients on a real WSA installation.
 - [ ] Add an accurate VPN service status indicator only if a stable Android system signal can be verified across supported WSA builds. Do not infer tunnel state from app launch.
 - [ ] Add provider labels/icons from Android metadata if the retrieval method is tested and reliable.
 - [ ] Add clear recovery guidance for VPN providers that install but cannot connect under a particular WSA networking mode; do not silently toggle Local network access or Windows networking.
-- [ ] Keep Android/WSA VPN scope separate from host-wide Windows VPN support. Add a Windows VPN hand-off only as a separately labelled integration if requested.
 
 ## Priority 2 — Release readiness
 
