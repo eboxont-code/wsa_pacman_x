@@ -28,6 +28,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 class GState {
   // App options
   static final connectionStatus = SharedValue(value: WSAPeriodicConnector.alertStatus);
+  static final adbConnectionDiagnostic = SharedValue<String>(value: "");
   static final ipAddress = PersistableValue<String>(value: "127.0.0.1", loader: (o)=>o.ipAddress.asIpv4, setter:  (o,e)=>o.ipAddress = e.ipv4AsInt ?? IntUtils.LOCALHOST);
   static final androidPort = PersistableValue<int>(value: 58526, loader: (o)=>o.port, setter: (o,e)=>o.port = e);
   static final androidPortPending = SharedValue(value: androidPort.$.toString());

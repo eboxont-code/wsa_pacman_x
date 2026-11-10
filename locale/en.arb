@@ -14,6 +14,9 @@
     "btn_boot": "Turn on",
     "btn_auth": "Reauthenticate",
     "btn_dev_settings": "Developer options",
+    "btn_open_wsa_settings": "Open WSA Settings",
+    "btn_retry_connection": "Retry connection",
+    "offline_developer_mode_help": "In WSA Settings > Advanced settings, turn Developer mode on. Then open Developer options and enable USB debugging. Return here and press Retry connection. Approve the Android authorization prompt if it appears.",
     "btn_switch_on": "On",
     "btn_switch_off": "Off",
 

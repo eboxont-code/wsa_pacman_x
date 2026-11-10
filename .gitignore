@@ -44,3 +44,16 @@ app.*.map.json
 ios/
 linux/
 macos/
+# Visual Studio generated files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Local installer output and temporary files
+installer/Output/
+*.tmp
+*.bak
+Thumbs.db
+desktop.ini
