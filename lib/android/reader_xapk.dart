@@ -15,6 +15,7 @@ import 'package:wsa_pacman/global_state.dart';
 import 'package:wsa_pacman/io/isolate_runner.dart';
 import 'package:wsa_pacman/main.dart';
 import 'package:wsa_pacman/utils/misc_utils.dart';
+import 'package:wsa_pacman/utils/adb_operation.dart';
 import 'package:wsa_pacman/proto/manifest_xapk.pb.dart';
 import 'package:wsa_pacman/utils/wsa_utils.dart';
 import 'package:wsa_pacman/windows/win_io.dart';
@@ -53,19 +54,51 @@ class XapkReader extends IsolateRunner<String, APK_READER_FLAGS> {
   static ManifestXapk _decodeManifest(List<int> bytes) => ManifestXapk.create()
     ..mergeFromProto3Json(utf8.decoder.fuse(json.decoder).convert(bytes));
 
-  static Future<List<ProcessResult>> copyApkResources(List<ManifestXapk_ApkExpansion> expansions, String workingDir, String ipAddress, int port) => Future.wait(() sync* {
+  static Future<List<ProcessResult>> copyApkResources(
+      List<ManifestXapk_ApkExpansion> expansions,
+      String workingDir,
+      String ipAddress,
+      int port) async {
     int index = 0;
-    for (ManifestXapk_ApkExpansion exp in expansions) {
+    final operations = expansions.map((exp) async {
       if (exp.installPath.isEmpty) exp.installPath = exp.file;
       final tempName = '${path.basename(workingDir)}@${index++}';
       final resourceName = path.basename(exp.installPath);
-      final resourceDir = '${exp.installPath.startsWith('/') ? '' : '/sdcard/'}${path.dirname(exp.installPath)}';
-      yield ADBUtils.pushToAddress(ipAddress, port, exp.file, '/sdcard/$tempName', workDir: workingDir)
-          .timeout(const Duration(seconds: 30)).then((_) =>
-          ADBUtils.shellToAddress(ipAddress, port, 'mkdir -p "$resourceDir"; cd "$resourceDir"; mv /sdcard/$tempName ./$resourceName')
-              .timeout(const Duration(seconds: 30)));
-    }
-  }());
+      final resourceDir =
+          '${exp.installPath.startsWith('/') ? '' : '/sdcard/'}${path.dirname(exp.installPath)}';
+
+      final pushResult = await ADBUtils.pushToAddress(
+        ipAddress, port, exp.file, '/sdcard/$tempName',
+        workDir: workingDir,
+      ).timeout(const Duration(seconds: 30));
+      requireAdbCommandSuccess(
+        operation: 'push expansion ${exp.file}',
+        exitCode: pushResult.exitCode,
+        stdout: pushResult.stdout,
+        stderr: pushResult.stderr,
+      );
+
+      final remoteSource = '/sdcard/$tempName';
+      final remoteDestination = '$resourceDir/$resourceName';
+      final moveCommand =
+          'mkdir -p ${quoteAdbShellArgument(resourceDir)} && '
+          'mv ${quoteAdbShellArgument(remoteSource)} ${quoteAdbShellArgument(remoteDestination)}';
+      final moveResult = await ADBUtils.shellToAddress(
+        ipAddress, port, moveCommand,
+      ).timeout(const Duration(seconds: 30));
+      requireAdbCommandSuccess(
+        operation: 'place expansion ${exp.installPath}',
+        exitCode: moveResult.exitCode,
+        stdout: moveResult.stdout,
+        stderr: moveResult.stderr,
+      );
+
+      return <ProcessResult>[pushResult, moveResult];
+    });
+
+    final results = await Future.wait(operations);
+    return results.expand((result) => result).toList();
+  }
 
   static void installXApk(String workingDir /* tempDir */, List<String> apkFiles, List<ManifestXapk_ApkExpansion> expansions, String ipAddress, int port, AppLocalizations lang, int timeout, FileDisposeQueue disposeLock, [bool downgrade = false]) async {
     if (apkFiles.isNotEmpty) log("INSTALLING \"${apkFiles.first}\" on on $ipAddress:$port...");
@@ -76,19 +109,26 @@ class XapkReader extends IsolateRunner<String, APK_READER_FLAGS> {
     GState.apkInstallState.update((_) => InstallState.INSTALLING);
 
     final result = await installation;
-    await resources;
+    String? resourceCopyError;
+    try {
+      await resources;
+    } catch (error, stackTrace) {
+      resourceCopyError = error.toString();
+      log("XAPK expansion resource copy failed: $error\n$stackTrace");
+    }
 
     if (!result.isTimeout) Directory(workingDir).deleteSync(recursive: true);
     log("EXIT CODE: ${result.exitCode}");
     String error = result.stderr.toString();
     log("OUTPUT: ${result.stdout}");
     log("ERROR: $error");
-    if (result.exitCode == 0) GState.apkInstallState.update((_) => InstallState.SUCCESS);
-    else if (result.isTimeout) {
+    if (result.exitCode == 0 && resourceCopyError == null) {
+      GState.apkInstallState.update((_) => InstallState.SUCCESS);
+    } else if (result.isTimeout) {
       GState.apkInstallState.update((_) => InstallState.TIMEOUT);
       GState.errorCode.update((_) => "TIMEOUT");
       GState.errorDesc.update((_) => '${lang.installer_error_timeout}\n\n${lang.installer_warning_dirty(workingDir)}');
-    } else {
+    } else if (result.exitCode != 0) {
       GState.apkInstallState.update((_) => InstallState.ERROR);
       //TODO add cause
       RegExpMatch? errorMatch = RegExp(r'(^|\n)\s*adb:\s+failed\s+to\s+install\s+.*:\s+Failure\s+\[([^:]*):\s*([^\s].*[^\s])\s*\]').firstMatch(error);
@@ -96,6 +136,10 @@ class XapkReader extends IsolateRunner<String, APK_READER_FLAGS> {
       GState.errorCode.update((_) => errorCode.isNotEmpty ? errorCode : "UNKNOWN_ERROR");
       String errorDesc = errorMatch?.group(3) ?? "";
       GState.errorDesc.update((_) => errorDesc.isNotEmpty ? errorDesc : lang.installer_error_nomsg);
+    } else {
+      GState.apkInstallState.update((_) => InstallState.ERROR);
+      GState.errorCode.update((_) => "RESOURCE_COPY_FAILED");
+      GState.errorDesc.update((_) => resourceCopyError ?? lang.installer_error_nomsg);
     }
   }
 
