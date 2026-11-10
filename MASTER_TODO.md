@@ -10,6 +10,7 @@ This file is the single project task register. Keep it concise, current and evid
 - [x] **Prerequisite automation requirements.** Full Windows, firmware, model identification, restart/resume, manufacturer support and data-protection specification added in [docs/WSA_PREREQUISITE_AUTOMATION_SPEC.md](docs/WSA_PREREQUISITE_AUTOMATION_SPEC.md). [PR #25](https://github.com/eboxont-code/wsa_pacman_x/pull/25).
 - [x] **Scoped PacMan uninstaller.** Add a readable Start-menu uninstall shortcut and remove only PacMan-owned files and this user's PacMan settings folders. The separate WSA runtime and Android data are excluded. A live install/uninstall test is still required on a Windows PC.
 - [x] **Repository CI and documentation housekeeping.** Run the complete Flutter test suite, build on pushes and pull requests to `main`, align the displayed/package/installer versions, remove the unused Flutter counter-test scaffold, and add contribution/security/repository-structure guidance.
+- [x] **Post-install launch option and version audit.** Add a preselected `Launch WSA PacMan` checkbox to the installer Finish page, guard the launch against a missing installed executable, and align the native Windows file/product version with the package/app/installer version. CI validates the launch entry and native version metadata.
 
 ## Priority 0 — WSA setup safety and recovery
 
