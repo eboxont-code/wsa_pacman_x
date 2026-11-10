@@ -55,6 +55,16 @@
     "wsa_manage": "Android Management",
     "wsa_manage_app": "Manage Applications",
     "wsa_manage_settings": "Manage Settings",
+    "wsa_manage_vpn": "Manage VPN settings",
+    "wsa_vpn_scope_note": "VPN apps run inside Android in WSA. Android controls consent and the VPN connection; this does not protect Windows desktop traffic.",
+    "wsa_vpn_apps_header": "Installed Android VPN apps",
+    "wsa_vpn_apps_description": "Find apps that declare an Android VPN service, then open the provider app to sign in and connect. Android controls the VPN permission and connection.",
+    "wsa_vpn_find_apps": "Find VPN apps",
+    "wsa_vpn_searching": "Searching for VPN apps...",
+    "wsa_vpn_no_apps": "No installed apps declaring an Android VPN service were found. Install a compatible VPN APK, then search again.",
+    "wsa_vpn_discovery_failed": "Could not search for VPN apps. Check the WSA connection or open Android VPN settings instead.",
+    "wsa_vpn_launch_failed": "Could not open this VPN app. It may not provide a launcher activity.",
+    "wsa_vpn_connect_first": "Connect to WSA to discover and open Android VPN apps.",
 
     
     "settings_port": "WSA Port",

@@ -7,6 +7,7 @@ import 'package:wsa_pacman/main.dart';
 import 'package:wsa_pacman/windows/win_io.dart';
 import 'package:wsa_pacman/windows/win_pkg.dart';
 import 'wsa_settings_launcher.dart';
+import 'vpn_support.dart';
 import '../utils/string_utils.dart';
 import '../utils/regexp_utils.dart';
 
@@ -24,6 +25,87 @@ class WSAUtils {
     return launched;
   }
   static bool launchSettings() => launchApp("com.android.settings");
+
+  /// Discovers installed packages that declare an Android VpnService.
+  ///
+  /// PackageManager performs the query inside WSA, so this works for any
+  /// provider that registers the standard android.net.VpnService action.
+  /// The provider app still owns connection setup and Android consent.
+  static Future<List<VpnProvider>> discoverVpnApps({
+    required String ipAddress,
+    required int port,
+  }) async {
+    final result = await ADBUtils.shellToAddress(
+      ipAddress,
+      port,
+      'cmd package query-services --brief --components -a android.net.VpnService',
+    );
+    if (result.exitCode != 0) {
+      final output = [
+        result.stderr?.toString() ?? '',
+        result.stdout?.toString() ?? '',
+      ].where((value) => value.trim().isNotEmpty).join(' ').trim();
+      throw StateError(output.isEmpty
+          ? 'Android Package Manager could not query VPN services (exit code ${result.exitCode}).'
+          : output);
+    }
+    return parseVpnServiceQuery(result.stdout?.toString() ?? '');
+  }
+
+  /// Opens the launch activity of a discovered Android VPN provider.
+  ///
+  /// Package names are validated before they are included in the ADB shell
+  /// command. The app must expose a launcher activity to be opened this way.
+  static Future<ProcessResult> launchVpnApp({
+    required String ipAddress,
+    required int port,
+    required String packageName,
+  }) {
+    if (!isSafeAndroidPackageName(packageName)) {
+      return Future.error(ArgumentError.value(
+        packageName,
+        'packageName',
+        'Invalid Android package name',
+      ));
+    }
+    return ADBUtils.shellToAddress(
+      ipAddress,
+      port,
+      'am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p $packageName',
+    );
+  }
+
+  /// Opens Android's system VPN settings inside WSA.
+  ///
+  /// The VPN client remains responsible for its connection, credentials and
+  /// first-use consent. This does not create a VPN tunnel or change Windows
+  /// desktop networking.
+  static Future<ProcessResult> launchVpnSettings({
+    required String ipAddress,
+    required int port,
+  }) async {
+    final vpnSettings = await ADBUtils.shellToAddress(
+      ipAddress,
+      port,
+      'am start -a android.settings.VPN_SETTINGS',
+    );
+    final output =
+        '${vpnSettings.stdout ?? ''}\n${vpnSettings.stderr ?? ''}'
+            .toLowerCase();
+    final couldNotResolveVpnSettings = vpnSettings.exitCode != 0 ||
+        output.contains('unable to resolve') ||
+        output.contains('error type 3') ||
+        output.contains('no activity found');
+    if (!couldNotResolveVpnSettings) return vpnSettings;
+
+    // Some WSA images do not expose the VPN-specific settings intent.
+    // Fall back to Android Settings so the user can navigate manually.
+    return ADBUtils.shellToAddress(
+      ipAddress,
+      port,
+      'am start com.android.settings/.Settings',
+    );
+  }
   static bool launchDeveloperSettings() => launch("/deeplink wsa-client://developer-settings");
 
   /// Opens the installed Windows Subsystem for Android Settings app.

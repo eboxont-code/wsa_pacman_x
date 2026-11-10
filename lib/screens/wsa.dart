@@ -8,6 +8,7 @@ import 'package:wsa_pacman/utils/wsa_utils.dart';
 import 'package:wsa_pacman/widget/fluent_card.dart';
 import 'package:wsa_pacman/widget/fluent_info_bar.dart';
 import 'package:wsa_pacman/widget/smooth_list_view.dart';
+import 'package:wsa_pacman/widget/vpn_management_panel.dart';
 import '../main.dart';
 import '../global_state.dart';
 
@@ -107,6 +108,13 @@ class _ScreenWSAState extends State<ScreenWSA> {
                 connectionStatus.isPoweredOn ? () => WSAUtils.launchSettings() : null : 
                 () => ADBUtils.shellToAddress(GState.ipAddress.of(context), GState.androidPort.of(context), 
                   r'am start com.android.settings/.Settings'),
+          ),
+          smallSpacer,
+          VpnManagementPanel(
+            key: ValueKey('${GState.ipAddress.of(context)}:${GState.androidPort.of(context)}'),
+            isConnected: connectionStatus.isConnected,
+            ipAddress: GState.ipAddress.of(context),
+            port: GState.androidPort.of(context),
           )
 
         ],

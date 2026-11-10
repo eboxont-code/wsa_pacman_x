@@ -9,7 +9,7 @@
 - Open APK and XAPK files directly with WSA PacMan.
 - Inspect package name, app icon, version and Android permissions before installation.
 - Install, upgrade, reinstall and downgrade Android applications.
-- Open Android Settings and the Manage Applications screen.
+- Open Android Settings, Manage Applications and Android's system VPN settings for compatible VPN apps.
 - Show WSA and ADB connection state, with useful offline and authorization diagnostics.
 - Start WSA for direct APK installs, identify a unique WSA ADB endpoint when available, and guide users through Developer mode, USB debugging and reconnect steps.
 - Keep the main manager in the Windows notification area and hide/restore the Android workspace without stopping Android apps.
@@ -56,6 +56,13 @@ During installation, leave **Install the matching WSA Android runtime** selected
 
 After WSA is running, open WSA Settings and enable **Developer mode**. In the Android Developer options, enable **USB debugging** and approve the Android authorization prompt when Windows/Android displays it. These Android security prompts are intentionally user-controlled; PacMan cannot approve them silently.
 
+### VPN apps inside WSA
+
+Install any compatible Android VPN client APK with PacMan, then open PacMan's **WSA** page and select **Find VPN apps**. PacMan queries Android Package Manager for apps declaring the standard `android.net.VpnService` service, lists the matching package names, and can launch a selected provider app. Use the provider app's own sign-in and **Connect** controls. Android displays and controls the first-use VPN permission request. The **Manage VPN settings** button opens Android's system VPN settings.
+
+Android allows one prepared/active VPN service per Android user/profile; switching providers is controlled by Android and the VPN apps. Each provider owns its account, server choices, protocol, configuration, tunnel and connection status. PacMan does not provide a VPN service, collect VPN credentials or claim a tunnel is connected just because an app was launched.
+
+This feature protects Android app traffic routed through WSA's Android VPN service only. It does **not** automatically protect Windows desktop traffic; configure a separate Windows VPN for that. A service declaration is a discovery signal, not a guarantee that every provider feature is compatible with WSA. Test the provider you intend to use. WSA's **Local network access** setting controls Android access to devices on the local network; it is not the Android VPN permission switch. PacMan does not change that setting or Windows networking automatically.
 ### Uninstalling PacMan
 
 Use **Start → WSA PacMan → Uninstall WSA PacMan**. The uninstaller removes the files installed by PacMan and this user's PacMan settings folders. It does **not** remove the separately installed WSA runtime under `%ProgramData%\WSABuilds`, or uninstall Android apps or delete Android user data.
@@ -91,6 +98,7 @@ The Windows workflow also validates the PowerShell runtime helper and installer 
 - [WSA prerequisite automation specification](docs/WSA_PREREQUISITE_AUTOMATION_SPEC.md) — Windows prerequisites, firmware safety, restart recovery and Android data protection requirements.
 - [Repository structure](docs/REPOSITORY_STRUCTURE.md) — what belongs in each directory and which assets are intentionally tracked.
 - [Windows CI guide](docs/CI.md) — workflow triggers, validation steps and build artifact handling.
+- [VPN support](docs/VPN_SUPPORT.md) — provider discovery, Android consent, WSA scope and safety.
 - [Contributing guide](CONTRIBUTING.md) — local checks, branch and pull request standards.
 - [Security policy](SECURITY.md) — how to report a vulnerability privately.
 
