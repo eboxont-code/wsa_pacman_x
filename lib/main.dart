@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_value/shared_value.dart';
 import 'package:wsa_pacman/io/isolate_runner.dart';
 import 'package:wsa_pacman/utils/misc_utils.dart';
+import 'package:wsa_pacman/utils/adb_connection.dart';
 import 'package:wsa_pacman/utils/wsa_utils.dart';
 import 'package:wsa_pacman/utils/locale_utils.dart';
 import 'package:wsa_pacman/widget/themed_pane_item.dart';
@@ -101,15 +102,52 @@ class Env {
 class WSAPeriodicConnector {
   static const PERIODIC_CHECK_BOOT_DURATION = Duration(milliseconds: 500);
   static const PERIODIC_CHECK_SLEEPING_DURATION = Duration(milliseconds: 750);
-  static const PERIODIC_CHECK_CONNECT_DURATION = Duration(seconds: 5);
+  static const PERIODIC_CHECK_CONNECT_DURATION = wsaSteadyPollInterval;
   static int lastStart = 0;
-  static bool get shouldWaitStart => DateTime.now().millisecondsSinceEpoch - lastStart < 15000;
+  static bool get shouldWaitStart => isWsaStartupPending(
+    startedAtMilliseconds: lastStart,
+    nowMilliseconds: DateTime.now().millisecondsSinceEpoch,
+  );
   static final DynamicTimer timer = DynamicTimer((Timer t) => WSAPeriodicConnector._checkConnectionStatus());
+
+  /// Starts a bounded fast-poll window as soon as PacMan successfully asks
+  /// Windows to launch WSA. This covers cold boots where WSA's VM and ADB
+  /// listener appear well after the launcher command returns.
+  static void notifyStartupRequested() {
+    lastStart = DateTime.now().millisecondsSinceEpoch;
+    timer.setDuration(PERIODIC_CHECK_BOOT_DURATION);
+    if (status != ConnectionStatus.STARTING) {
+      status = ConnectionStatus.STARTING;
+      GState.connectionStatus.$ = status.statusAlert;
+    }
+  }
   static ConnectionStatus status = ConnectionStatus.UNKNOWN;
   static WSAStatusAlert alertStatus = ConnectionStatus.UNKNOWN.statusAlert;
   static bool _statusInitialized = false;
 
+  static bool _connectionCheckInProgress = false;
+
   static void _checkConnectionStatus() async {
+    // Timer.periodic does not wait for async callbacks. Do not overlap slow
+    // WSA/ADB probes when startup takes longer than a normal polling interval.
+    if (_connectionCheckInProgress) return;
+    _connectionCheckInProgress = true;
+    try {
+      await _checkConnectionStatusOnce();
+    } catch (error, stackTrace) {
+      log("WSA/ADB connection check failed: $error\n$stackTrace");
+      final fallbackStatus = Env.WSA_INSTALLED
+          ? ConnectionStatus.OFFLINE
+          : ConnectionStatus.DISCONNECTED;
+      if (status != fallbackStatus) {
+        GState.connectionStatus.$ = (status = fallbackStatus).statusAlert;
+      }
+    } finally {
+      _connectionCheckInProgress = false;
+    }
+  }
+
+  static Future<void> _checkConnectionStatusOnce() async {
     if (_statusInitialized) {
       Process.run('${Env.SYSTEM_ROOT}\\System32\\tasklist.exe', []).then((result){
         if (!result.stdout.toString().contains(RegExp(r'(^|\n)adb.exe\s+'))) {
@@ -121,67 +159,149 @@ class WSAPeriodicConnector {
 
     if (!WSAStatus.isBooted) {
       timer.setDuration(PERIODIC_CHECK_BOOT_DURATION);
-      ConnectionStatus newStatus = Env.WSA_INSTALLED ? ConnectionStatus.ARRESTED : WinVer.isWindows11OrGreater ? ConnectionStatus.MISSING : ConnectionStatus.UNSUPPORTED;
+      ConnectionStatus newStatus = shouldWaitStart
+          ? ConnectionStatus.STARTING
+          : Env.WSA_INSTALLED
+              ? ConnectionStatus.ARRESTED
+              : WinVer.isWindows11OrGreater
+                  ? ConnectionStatus.MISSING
+                  : ConnectionStatus.UNSUPPORTED;
       if (status != newStatus) GState.connectionStatus.$ = (status = newStatus).statusAlert;
       return;
     }
     else if (!WSAStatus.isRunning) {
       timer.setDuration(PERIODIC_CHECK_SLEEPING_DURATION);
-      ConnectionStatus newStatus = ConnectionStatus.ARRESTED;
+      ConnectionStatus newStatus = shouldWaitStart
+          ? ConnectionStatus.STARTING
+          : ConnectionStatus.ARRESTED;
       if (status != newStatus) GState.connectionStatus.$ = (status = newStatus).statusAlert;
       return;
     }
     else {
-      timer.setDuration(PERIODIC_CHECK_CONNECT_DURATION);
-      if (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.MISSING || status == ConnectionStatus.UNSUPPORTED)
-          lastStart = DateTime.now().millisecondsSinceEpoch;
+      if (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.MISSING || status == ConnectionStatus.UNSUPPORTED) {
+        lastStart = DateTime.now().millisecondsSinceEpoch;
+      }
+      timer.setDuration(wsaConnectionPollInterval(startupPending: shouldWaitStart));
     }
 
     final prevStatus = status;
-    final process = await ADBUtils.devices();
-    final output = process.stdout.toString();
-    if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+'))) {
-      if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+offline(\$|\\n|\\s)')))
-        status = (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.STARTING) && shouldWaitStart ? 
-            ConnectionStatus.STARTING : ConnectionStatus.OFFLINE;
-      else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+host(\$|\\n|\\s)'))) {
-        reconnect();
+    final process = await ADBUtils.devices(long: true);
+    final output = process.stdout?.toString() ?? '';
+    final configuredSerial = ADBUtils.deviceName;
+    final wsaEndpoint = findWsaAdbEndpoint(
+      output,
+      preferredSerial: configuredSerial,
+    );
+
+    if (wsaEndpoint != null) {
+      // Only adopt an alternate endpoint when ADB metadata identifies it as WSA.
+      // A regular phone or emulator is never considered for endpoint adoption.
+      if (GState.ipAddress.$ != wsaEndpoint.host) {
+        GState.ipAddress
+          ..update((_) => wsaEndpoint.host)
+          ..persist();
       }
-      else if (output.contains(RegExp('(^|\\n)(localhost|127.0.0.1):${GState.androidPort.$}\\s+unauthorized(\$|\\n|\\s)'))) {
-        status = ConnectionStatus.UNAUTHORIZED;
-        if (prevStatus == ConnectionStatus.UNKNOWN) reconnect();
+      if (GState.androidPort.$ != wsaEndpoint.port) {
+        GState.androidPort
+          ..update((_) => wsaEndpoint.port)
+          ..persist();
+        GState.androidPortPending.$ = wsaEndpoint.port.toString();
       }
-      else {
-        status = ConnectionStatus.CONNECTED;
-        if (output.contains(RegExp('(^|\\n)127.0.0.1:${GState.androidPort.$}\\s+'))) {
-          if (GState.ipAddress.$ != "127.0.0.1") GState.ipAddress.update((old) => "127.0.0.1");
-        }
-        else if (GState.ipAddress.$ != "localhost") GState.ipAddress.update((old) => "localhost");
+
+      switch (wsaEndpoint.state) {
+        case 'device':
+          GState.adbConnectionDiagnostic.update((_) => "");
+          status = ConnectionStatus.CONNECTED;
+          lastStart = 0;
+          timer.setDuration(PERIODIC_CHECK_CONNECT_DURATION);
+          break;
+        case 'unauthorized':
+          GState.adbConnectionDiagnostic.update((_) =>
+              'ADB reports ${wsaEndpoint.serial} as unauthorized. The Android authorization prompt may need approval.');
+          status = ConnectionStatus.UNAUTHORIZED;
+          if (prevStatus == ConnectionStatus.UNKNOWN) reconnect();
+          break;
+        case 'offline':
+          GState.adbConnectionDiagnostic.update((_) =>
+              'ADB reports ${wsaEndpoint.serial} as offline.');
+          status = (status == ConnectionStatus.ARRESTED ||
+                  status == ConnectionStatus.STARTING) && shouldWaitStart
+              ? ConnectionStatus.STARTING
+              : ConnectionStatus.OFFLINE;
+          break;
+        case 'host':
+          reconnect();
+          break;
       }
+    } else {
+      await _tryConnect();
     }
-    //else status = ConnectionStatus.DISCONNECTED;
-    /*if (status != prevStatus) {
-      (alert.title as Text).data = ""
-    }*/
-    else await _tryConnect();
+    // No WSA endpoint was found in the device list, so _tryConnect()
+    // was already attempted in the fallback branch above.
     if (status != prevStatus) GState.connectionStatus.update((p0) => status.statusAlert);
     _statusInitialized = false;
     log("Connection status: ${status.name()}");
   }
 
   static Future<void> reconnect() async {
+    final previousStatus = status;
     await ADBUtils.disconnectWSA();
     await _tryConnect();
+    if (status != previousStatus) {
+      GState.connectionStatus.$ = status.statusAlert;
+    }
   }
 
   static Future<void> _tryConnect() async {
-    ProcessResult? process = await ADBUtils.connectWSA().processTimeout(const Duration(milliseconds: 200));
-    if (process.stdout?.toString().contains(RegExp(r'(^|\n)(cannot|failed to) connect\s.*')) ?? true) 
-      status = Env.WSA_INSTALLED ? (status == ConnectionStatus.ARRESTED || status == ConnectionStatus.STARTING) && shouldWaitStart ? 
-          ConnectionStatus.STARTING : ConnectionStatus.OFFLINE : ConnectionStatus.DISCONNECTED;
-    else if (process.stdout?.toString().contains(RegExp(r'(^|\n)(cannot|failed to) authenticate\s.*')) ?? true) 
+    // On Windows, starting adb.exe/server can exceed 200 ms, especially just
+    // after WSA boots. Keep this below the five-second polling interval.
+    final ProcessResult process = await ADBUtils.connectWSA()
+        .processTimeout(const Duration(seconds: 3));
+    final stdout = process.stdout?.toString() ?? '';
+    final stderr = process.stderr?.toString() ?? '';
+    final output = '$stdout\n$stderr';
+    final outcome = classifyAdbConnectOutcome(
+      exitCode: process.exitCode,
+      stdout: stdout,
+      stderr: stderr,
+      timedOut: process.isTimeout,
+    );
+
+    if (outcome == AdbConnectOutcome.failed) {
+      GState.adbConnectionDiagnostic.update((_) => describeAdbConnectFailure(
+        endpoint: ADBUtils.deviceName,
+        exitCode: process.exitCode,
+        stdout: stdout,
+        stderr: stderr,
+        timedOut: process.isTimeout,
+      ));
+      if (process.isTimeout) {
+        log("ADB connection attempt timed out after 3 seconds");
+      } else {
+        log("ADB connection attempt failed (exit code: " +
+            process.exitCode.toString() + "): " + output);
+      }
+      status = Env.WSA_INSTALLED
+          ? (status == ConnectionStatus.ARRESTED ||
+                  status == ConnectionStatus.STARTING)
+              && shouldWaitStart
+              ? ConnectionStatus.STARTING
+              : ConnectionStatus.OFFLINE
+          : ConnectionStatus.DISCONNECTED;
+    } else if (outcome == AdbConnectOutcome.unauthorized) {
+      GState.adbConnectionDiagnostic.update((_) => describeAdbConnectFailure(
+        endpoint: ADBUtils.deviceName,
+        exitCode: process.exitCode,
+        stdout: stdout,
+        stderr: stderr,
+      ));
       status = ConnectionStatus.UNAUTHORIZED;
-    else status = ConnectionStatus.CONNECTED;
+    } else {
+      GState.adbConnectionDiagnostic.update((_) => "");
+      status = ConnectionStatus.CONNECTED;
+      lastStart = 0;
+      timer.setDuration(PERIODIC_CHECK_CONNECT_DURATION);
+    }
   }
 }
 
