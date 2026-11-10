@@ -107,6 +107,22 @@ class _ScreenWSAState extends State<ScreenWSA> {
                 connectionStatus.isPoweredOn ? () => WSAUtils.launchSettings() : null : 
                 () => ADBUtils.shellToAddress(GState.ipAddress.of(context), GState.androidPort.of(context), 
                   r'am start com.android.settings/.Settings'),
+          ),
+          smallSpacer,
+          FluentCard(
+            leading: const Icon(Mdi.vpn, size: 23),
+            content: Text(lang.wsa_manage_vpn),
+            isButton: true,
+            onPressed: connectionStatus.isDisconnected ? null : () {
+              WSAUtils.launchVpnSettings(
+                ipAddress: GState.ipAddress.of(context),
+                port: GState.androidPort.of(context),
+              );
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0, left: 4.0, right: 4.0),
+            child: Text(lang.wsa_vpn_scope_note),
           )
 
         ],
