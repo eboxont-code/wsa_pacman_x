@@ -112,6 +112,18 @@ jobs:
             }
           }
 
+          # Existing WSA registrations must not bypass prerequisite repair.
+          $existingPackageBranch = $scriptText.IndexOf('if ($existingPackages.Count -gt 0)')
+          if ($existingPackageBranch -lt 0) {
+            throw "The existing-WSA safety branch is missing"
+          }
+          $existingPackagePreflight = $scriptText.IndexOf('Confirm-WsaPrerequisites -Target $target', $existingPackageBranch)
+          $existingPackageSafetyExit = $scriptText.IndexOf('No WSA files or user data were changed.', $existingPackageBranch)
+          if ($existingPackagePreflight -lt 0 -or $existingPackageSafetyExit -lt 0 -or
+              $existingPackagePreflight -gt $existingPackageSafetyExit) {
+            throw "Existing WSA installations must pass the automatic Windows virtualization prerequisite check before PacMan exits safely"
+          }
+
           if ($scriptText -match "Download, verify, extract and install this matching WSA package now") {
             throw "The runtime installer must not add a redundant confirmation after its installer task has been selected"
           }
