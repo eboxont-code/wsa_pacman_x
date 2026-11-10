@@ -83,11 +83,29 @@ class WSAUtils {
   static Future<ProcessResult> launchVpnSettings({
     required String ipAddress,
     required int port,
-  }) => ADBUtils.shellToAddress(
-    ipAddress,
-    port,
-    'am start -a android.settings.VPN_SETTINGS',
-  );
+  }) async {
+    final vpnSettings = await ADBUtils.shellToAddress(
+      ipAddress,
+      port,
+      'am start -a android.settings.VPN_SETTINGS',
+    );
+    final output =
+        '${vpnSettings.stdout ?? ''}\n${vpnSettings.stderr ?? ''}'
+            .toLowerCase();
+    final couldNotResolveVpnSettings = vpnSettings.exitCode != 0 ||
+        output.contains('unable to resolve') ||
+        output.contains('error type 3') ||
+        output.contains('no activity found');
+    if (!couldNotResolveVpnSettings) return vpnSettings;
+
+    // Some WSA images do not expose the VPN-specific settings intent.
+    // Fall back to Android Settings so the user can navigate manually.
+    return ADBUtils.shellToAddress(
+      ipAddress,
+      port,
+      'am start com.android.settings/.Settings',
+    );
+  }
   static bool launchDeveloperSettings() => launch("/deeplink wsa-client://developer-settings");
 
   /// Opens the installed Windows Subsystem for Android Settings app.
