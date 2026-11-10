@@ -9,7 +9,7 @@
 - Open APK and XAPK files directly with WSA PacMan.
 - Inspect package name, app icon, version and Android permissions before installation.
 - Install, upgrade, reinstall and downgrade Android applications.
-- Open Android Settings and the Manage Applications screen.
+- Open Android Settings, Manage Applications and Android's system VPN settings for compatible VPN apps.
 - Show WSA and ADB connection state, with useful offline and authorization diagnostics.
 - Start WSA for direct APK installs, identify a unique WSA ADB endpoint when available, and guide users through Developer mode, USB debugging and reconnect steps.
 - Keep the main manager in the Windows notification area and hide/restore the Android workspace without stopping Android apps.
@@ -55,6 +55,14 @@ During installation, leave **Install the matching WSA Android runtime** selected
 ### WSA connection setup
 
 After WSA is running, open WSA Settings and enable **Developer mode**. In the Android Developer options, enable **USB debugging** and approve the Android authorization prompt when Windows/Android displays it. These Android security prompts are intentionally user-controlled; PacMan cannot approve them silently.
+
+### VPN apps inside WSA
+
+Install any compatible Android VPN client APK with PacMan, then launch that VPN app inside WSA and use its own **Connect** control. The first connection must be approved in Android's system VPN permission dialog. From PacMan's **WSA → Manage VPN connections** card, open Android's VPN settings to review/manage VPN clients already authorized by Android.
+
+Android allows only one active VPN service for an Android user/profile; starting another VPN service stops the previous one. VPN apps control their own accounts, server choices, protocols and tunnel. PacMan does not provide a VPN service or collect VPN credentials.
+
+This feature protects Android app traffic routed through WSA's Android VPN service. It does **not** automatically protect Windows desktop traffic; configure a separate Windows VPN for that. WSA VPN compatibility varies by provider and networking mode. The WSA **Local network access** setting controls Android access to devices on the local network; it is not the Android VPN permission switch. Test a VPN with local network access in its current state before changing it, and restart WSA after any change.
 
 ### Uninstalling PacMan
 
