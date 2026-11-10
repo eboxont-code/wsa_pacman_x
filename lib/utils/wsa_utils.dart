@@ -71,7 +71,7 @@ class WSAUtils {
     return ADBUtils.shellToAddress(
       ipAddress,
       port,
-      'monkey -p $packageName -c android.intent.category.LAUNCHER 1',
+      'am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p $packageName',
     );
   }
 
