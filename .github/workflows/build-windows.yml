@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - chore/clean-repository-and-integrate-apk-recovery
   pull_request:
     branches:
       - main
