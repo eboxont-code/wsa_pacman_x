@@ -62,7 +62,7 @@ Install any compatible Android VPN client APK with PacMan, then launch that VPN 
 
 Android allows only one active VPN service for an Android user/profile; starting another VPN service stops the previous one. VPN apps control their own accounts, server choices, protocols and tunnel. PacMan does not provide a VPN service or collect VPN credentials.
 
-This feature protects Android app traffic routed through WSA's Android VPN service. It does **not** automatically protect Windows desktop traffic; configure a separate Windows VPN for that. WSA VPN compatibility varies by provider and networking mode. The WSA **Local network access** setting controls Android access to devices on the local network; it is not the Android VPN permission switch. Test a VPN with local network access in its current state before changing it, and restart WSA after any change.
+This feature protects Android app traffic routed through WSA's Android VPN service. It does **not** automatically protect Windows desktop traffic; configure a separate Windows VPN for that. WSA VPN compatibility varies by provider and networking mode. The WSA **Local network access** setting controls Android access to devices on the local network; it is not the Android VPN permission switch. PacMan can discover services declaring Android's standard VPN service action and launch their provider app. Test a VPN with local network access in its current state before changing it, and restart WSA after any change.
 
 ### Uninstalling PacMan
 
