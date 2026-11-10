@@ -8,6 +8,11 @@ Currently provides a double-click GUI installer for .apk and .xapk files that sh
 
 The app additionally provides a button to open Android settings and one to open the "Manage Applications" Android settings page, from which you can uninstall or disable applications and grant or revoke permissions
 
+## Project plan and requirements
+
+- [Master task register](MASTER_TODO.md) — implementation queue, priorities, verification and release tasks.
+- [WSA prerequisite automation specification](docs/WSA_PREREQUISITE_AUTOMATION_SPEC.md) — complete requirements for Windows feature repair, firmware detection, manufacturer-aware guidance, safe vendor support, restart recovery and Android data protection.
+
 ## Self-contained Windows setup
 
 The Windows installer and portable package include the helper programs WSA PacMan uses (ADB, AAPT, AAPT2 and AXML decoding tools). The installer also carries the Microsoft Visual C++ x64 Redistributable and installs it automatically only when a suitable version is not already present. **You do not need to download Android platform-tools, ADB or the Visual C++ runtime separately.**
