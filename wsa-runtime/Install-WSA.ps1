@@ -647,6 +647,10 @@ try {
 
     $existingPackages = Get-ExistingWsaPackage
     if ($existingPackages.Count -gt 0) {
+        # An existing WSA registration still needs Windows virtualization features.
+        # Run the same prerequisite repair before returning without touching WSA data.
+        Confirm-WsaPrerequisites -Target $target
+
         $package = $existingPackages | Select-Object -First 1
         $installedArchitecture = [string]$package.Architecture
         Write-Host ''
