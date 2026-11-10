@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feature/generic-android-vpn-management # Temporary VPN PR verification.
   pull_request:
     branches:
       - main
@@ -369,86 +368,6 @@ jobs:
             build/installer/WSA-pacman-universal-v1.5.0-installer.exe
           if-no-files-found: error
           retention-days: 14
-).Groups[1].Value
-          if (-not $pubspecVersion -or $pubspecVersion -ne $appVersion -or $appVersion -ne $installerVersion) {
-            throw "Application, package and installer versions must match. pubspec=$pubspecVersion app=$appVersion installer=$installerVersion"
-          }
-          if ($installerText -notmatch "Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime") {
-            throw "The Android runtime helper must run hidden and finish before installer completion"
-          }
-          if ($installerText -match "skipifsilent") {
-            throw "Silent Inno Setup installs must still run the selected Android runtime task"
-          }
-          if ($installerText -notmatch "CloseApplications=yes" -or
-              $installerText -notmatch "RestartApplications=no" -or
-              $installerText -notmatch "function PrepareToInstall" -or
-              $installerText -notmatch "Stop-WSA-Adb.ps1" -or
-              $installerText -notmatch "RegisterWindowMessage" -or
-              $installerText -notmatch "PostBroadcastMessage") {
-            throw "Installer must stop the bundled ADB server before the Restart Manager file-in-use check"
-          }
-
-          $traySource = Get-Content "windows/runner/win32_window.cpp" -Raw
-          $trayHeader = Get-Content "windows/runner/win32_window.h" -Raw
-          $trayMain = Get-Content "windows/runner/main.cpp" -Raw
-          $trayCmake = Get-Content "windows/runner/CMakeLists.txt" -Raw
-          $trayChecks = @(
-            "WSA.PacMan.PrepareForUpgrade.1",
-            "ExitApplication",
-            "Shell_NotifyIconW",
-            "QueryFullProcessImageNameW",
-            "GetWindowThreadProcessId",
-            "EnumWindows",
-            "WsaClient.exe",
-            "WsaService",
-            "HideWsaAppWindows",
-            "RestoreWsaAppWindows",
-            "SetWindowPlacement",
-            "ShowWindow(window, SW_HIDE)",
-            "NIM_ADD",
-            "NIM_DELETE",
-            "TaskbarCreated",
-            "WM_CLOSE",
-            "SC_CLOSE",
-            "SIZE_MINIMIZED",
-            "Exit WSA PacMan",
-            "Show Android workspace",
-            "IsIconic(window_handle_)",
-            "IsIconic(hwnd)",
-            "tray_icon_added_ ? SW_HIDE : SW_MINIMIZE",
-            "notification-area icon could not be restored"
-          )
-          foreach ($check in $trayChecks) {
-            if ($traySource -notmatch [regex]::Escape($check)) {
-              throw "Required native tray behavior is missing: $check"
-            }
-          }
-          if (-not $trayHeader.Contains("SetCloseToTray") -or
-              -not $trayMain.Contains("SetCloseToTray(is_main_manager_window)") -or
-              -not $trayMain.Contains("command_line_arguments.empty()") -or
-              -not $trayCmake.Contains("shell32") -or
-              -not $trayCmake.Contains("advapi32") -or
-              $traySource.Contains("SetWinEventHook") -or
-              $trayHeader.Contains("WsaWindowEventCallback")) {
-            throw "The WSA PacMan main window is not fully configured for notification-area support"
-          }
-
-          $wsaUtilsText = Get-Content "lib/utils/wsa_utils.dart" -Raw
-          if ($wsaUtilsText -notmatch "appWindow.hide\(\)") {
-            throw "Launching an Android app from PacMan must hide only the manager so the newly launched app stays visible"
-          }
-
-          $installerText = Get-Content "installer/installer.iss" -Raw
-          $runtimeTask = $installerText -split "\r?\n" |
-            Where-Object { $_ -match '^Name: install_wsa_runtime;' } |
-            Select-Object -First 1
-          if (-not $runtimeTask) {
-            throw "The optional matching-WSA runtime installer task is missing"
-          }
-          if ($runtimeTask -match 'Flags:\s*unchecked') {
-            throw "The matching-WSA runtime installer task must be selected by default"
-          }
-
       - name: Build Windows application
         run: flutter build windows --release
 
