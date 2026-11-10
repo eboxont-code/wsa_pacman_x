@@ -98,8 +98,8 @@ class _VpnManagementPanelState extends State<VpnManagementPanel> {
       final output = '${result.stdout ?? ''}\n${result.stderr ?? ''}';
       final normalizedOutput = output.toLowerCase();
       final failed = result.exitCode != 0 ||
-          normalizedOutput.contains('no activities found') ||
-          normalizedOutput.contains('monkey aborted') ||
+          normalizedOutput.contains('no activity found') ||
+          normalizedOutput.contains('error type 3') ||
           normalizedOutput.contains('unable to resolve');
       if (!mounted) return;
       setState(() {
