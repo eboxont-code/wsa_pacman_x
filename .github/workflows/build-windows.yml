@@ -219,8 +219,8 @@ jobs:
           }
           $packageVersionMatch = [regex]::Match((Get-Content "pubspec.yaml" -Raw), '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)')
           $runnerResource = Get-Content "windows/runner/Runner.rc" -Raw
-          $nativeVersionNumber = [regex]::Match($runnerResource, '(?m)^#define VERSION_AS_NUMBER ([0-9,]+)$').Groups[1].Value
-          $nativeVersionString = [regex]::Match($runnerResource, '(?m)^#define VERSION_AS_STRING "([^"]+)"$').Groups[1].Value
+          $nativeVersionNumber = [regex]::Match($runnerResource, '(?m)^#define VERSION_AS_NUMBER ([0-9,]+)\r?$').Groups[1].Value
+          $nativeVersionString = [regex]::Match($runnerResource, '(?m)^#define VERSION_AS_STRING "([^"]+)"\r?$').Groups[1].Value
           $expectedNativeVersionString = "$($packageVersionMatch.Groups[1].Value).$($packageVersionMatch.Groups[2].Value)"
           $expectedNativeVersionNumber = (($packageVersionMatch.Groups[1].Value -split '\.') + $packageVersionMatch.Groups[2].Value) -join ','
           if (-not $packageVersionMatch.Success -or
