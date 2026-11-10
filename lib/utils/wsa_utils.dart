@@ -24,6 +24,20 @@ class WSAUtils {
     return launched;
   }
   static bool launchSettings() => launchApp("com.android.settings");
+
+  /// Opens Android's system VPN settings inside WSA.
+  ///
+  /// The VPN client remains responsible for its connection, credentials and
+  /// first-use consent. This does not create a VPN tunnel or change Windows
+  /// desktop networking.
+  static Future<ProcessResult> launchVpnSettings({
+    required String ipAddress,
+    required int port,
+  }) => ADBUtils.shellToAddress(
+    ipAddress,
+    port,
+    'am start -a android.settings.VPN_SETTINGS',
+  );
   static bool launchDeveloperSettings() => launch("/deeplink wsa-client://developer-settings");
 
   /// Opens the installed Windows Subsystem for Android Settings app.
