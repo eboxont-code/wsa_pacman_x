@@ -8,6 +8,7 @@ import 'package:wsa_pacman/utils/wsa_utils.dart';
 import 'package:wsa_pacman/widget/fluent_card.dart';
 import 'package:wsa_pacman/widget/fluent_info_bar.dart';
 import 'package:wsa_pacman/widget/smooth_list_view.dart';
+import 'package:wsa_pacman/widget/vpn_management_panel.dart';
 import '../main.dart';
 import '../global_state.dart';
 
@@ -109,20 +110,11 @@ class _ScreenWSAState extends State<ScreenWSA> {
                   r'am start com.android.settings/.Settings'),
           ),
           smallSpacer,
-          FluentCard(
-            leading: const Icon(Mdi.vpn, size: 23),
-            content: Text(lang.wsa_manage_vpn),
-            isButton: true,
-            onPressed: connectionStatus.isDisconnected ? null : () {
-              WSAUtils.launchVpnSettings(
-                ipAddress: GState.ipAddress.of(context),
-                port: GState.androidPort.of(context),
-              );
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0, left: 4.0, right: 4.0),
-            child: Text(lang.wsa_vpn_scope_note),
+          VpnManagementPanel(
+            key: ValueKey('${GState.ipAddress.of(context)}:${GState.androidPort.of(context)}'),
+            isConnected: connectionStatus.isConnected,
+            ipAddress: GState.ipAddress.of(context),
+            port: GState.androidPort.of(context),
           )
 
         ],
