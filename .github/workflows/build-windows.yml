@@ -217,11 +217,39 @@ jobs:
           if (-not $pubspecVersion -or $pubspecVersion -ne $appVersion -or $appVersion -ne $installerVersion) {
             throw "Application, package and installer versions must match (including CRLF files). pubspec=$pubspecVersion app=$appVersion installer=$installerVersion"
           }
-          if ($installerText -notmatch "Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime") {
-            throw "The Android runtime helper must run hidden and finish before installer completion"
+          $packageVersionMatch = [regex]::Match((Get-Content "pubspec.yaml" -Raw), '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)')
+          $runnerResource = Get-Content "windows/runner/Runner.rc" -Raw
+          $nativeVersionNumber = [regex]::Match($runnerResource, '(?m)^#define VERSION_AS_NUMBER ([0-9,]+)$').Groups[1].Value
+          $nativeVersionString = [regex]::Match($runnerResource, '(?m)^#define VERSION_AS_STRING "([^"]+)"$').Groups[1].Value
+          $expectedNativeVersionString = "$($packageVersionMatch.Groups[1].Value).$($packageVersionMatch.Groups[2].Value)"
+          $expectedNativeVersionNumber = (($packageVersionMatch.Groups[1].Value -split '\.') + $packageVersionMatch.Groups[2].Value) -join ','
+          if (-not $packageVersionMatch.Success -or
+              $nativeVersionString -ne $expectedNativeVersionString -or
+              $nativeVersionNumber -ne $expectedNativeVersionNumber) {
+            throw "Windows executable resource version must match pubspec version/build. expected=$expectedNativeVersionString ($expectedNativeVersionNumber), actual=$nativeVersionString ($nativeVersionNumber)"
           }
-          if ($installerText -match "skipifsilent") {
-            throw "Silent Inno Setup installs must still run the selected Android runtime task"
+          $runSection = [regex]::Match($installerText, '(?ms)^\[Run\]\s*(.*?)(?=^\[|\z)').Groups[1].Value
+          $runtimeRunStart = $runSection.IndexOf('Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"')
+          $launchRunStart = $runSection.IndexOf('Description: "Launch WSA PacMan"')
+          if ($runtimeRunStart -lt 0 -or $launchRunStart -le $runtimeRunStart) {
+            throw "The WSA runtime helper must run before the optional PacMan launch"
+          }
+          $runtimeRunEntry = $runSection.Substring($runtimeRunStart, $launchRunStart - $runtimeRunStart)
+          if ($runtimeRunEntry -notmatch 'Flags: runhidden waituntilterminated; Tasks: install_wsa_runtime' -or
+              $runtimeRunEntry -match '\bskipifsilent\b') {
+            throw "The selected WSA runtime helper must run hidden and complete even during silent installation"
+          }
+
+          $launchRunEntry = @($runSection -split "\r?\n" | Where-Object { $_ -match 'Description: "Launch WSA PacMan"' }) |
+            Select-Object -First 1
+          if (-not $launchRunEntry -or
+              -not $launchRunEntry.Contains('Filename: "{app}\{#executable}"') -or
+              -not $launchRunEntry.Contains("Check: FileExists(ExpandConstant('{app}\{#executable}'))") -or
+              $launchRunEntry -notmatch 'Flags: postinstall\b' -or
+              $launchRunEntry -notmatch '\bnowait\b' -or
+              $launchRunEntry -notmatch '\bskipifsilent\b' -or
+              $launchRunEntry -match '\bunchecked\b') {
+            throw "The Finish page must offer a preselected, silent-safe Launch WSA PacMan option for the installed executable"
           }
           if ($installerText -notmatch "CloseApplications=yes" -or
               $installerText -notmatch "RestartApplications=no" -or
