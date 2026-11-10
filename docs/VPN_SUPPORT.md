@@ -2,54 +2,63 @@
 
 ## Goal
 
-Allow users to install and manage compatible Android VPN clients in Windows Subsystem for Android (WSA) through WSA PacMan. The feature is provider-neutral; MystNodes is one possible Android app, not a special case.
+Manage compatible Android VPN clients inside Windows Subsystem for Android (WSA) through WSA PacMan. Support is provider-neutral; MystNodes is one possible Android app, not a special case.
 
-## Initial integration
+## Implemented
 
-The WSA management screen includes **Manage VPN connections**, which opens Android's system VPN settings through the intent action `android.settings.VPN_SETTINGS`.
+- Open Android's standard VPN settings through the `android.settings.VPN_SETTINGS` intent.
+- Discover Android services registered for the `android.net.VpnService` intent using Package Manager.
+- Group discovered service components by package and list the matching package names in PacMan's WSA management page.
+- Launch a selected provider's Android launcher activity through the existing ADB connection.
+- Leave provider login, configuration, first-use consent, connect/disconnect controls and tunnel lifecycle inside the provider app and Android.
+- Display discovery and launch failures without representing an app launch as proof that a VPN is connected.
 
-Users install a VPN client APK with PacMan, launch the client in WSA, tap its Connect control and approve Android's system consent dialog. PacMan opens Android's settings page for managing VPN clients already authorized by Android.
+The discovery command is:
+
+```sh
+cmd package query-services --brief --components -a android.net.VpnService
+```
+
+PacMan parses strict Android component names and validates package names again before constructing an ADB shell command.
 
 ## Platform model
 
-- Android VPN apps normally implement Android's `VpnService` API.
-- The VPN provider app owns its configuration, account credentials, protocols, gateway selection, tunnel lifecycle and notification.
-- Android owns the first-use trust/consent dialog and system VPN settings.
-- Android permits one active VPN service for an Android user/profile. Starting a different VPN service stops the prior active service.
-- WSA supports VPN connectivity, but compatibility varies between VPN clients and WSA networking modes.
-- WSA's **Local network access** toggle is a local-LAN networking feature, not the same control as Android's per-app VPN consent. PacMan must not silently change it.
+- Android VPN apps normally implement Android's `VpnService` API and declare a service protected by `android.permission.BIND_VPN_SERVICE` with the `android.net.VpnService` intent action. See the [Android VPN guide](https://developer.android.com/develop/connectivity/vpn) and [VpnService API](https://developer.android.com/reference/android/net/VpnService).
+- The provider app owns account credentials, protocols, gateway selection, tunnel lifecycle and its own notifications.
+- Android owns the first-use VPN consent dialog and system VPN settings. The VPN app calls `VpnService.prepare()` to request consent; PacMan cannot grant this on the app's behalf.
+- Android allows one prepared/active VPN service per Android user/profile. Starting another provider is controlled by Android and may replace the previously selected VPN.
+- VPN apps may configure per-app routing. PacMan does not override a provider's allowed/disallowed application lists.
+- WSA VPN compatibility varies by provider, Android image and networking mode.
 
 ## Scope
 
-The initial feature manages Android VPN clients and traffic inside WSA. It does not create or provide a VPN service, does not tunnel Windows desktop traffic, and does not install Windows VPN drivers or change Windows routes. Host-wide VPN support is a separate Windows integration.
+This feature controls Android VPN apps and Android app traffic inside WSA only. It does not create a VPN tunnel, provide a VPN service, tunnel Windows desktop traffic, install Windows VPN drivers, alter Windows routes or control host-wide Windows VPN software. Host-wide VPN support is out of scope.
 
-## Safety and UX
+## Safety
 
 1. Never request or store VPN usernames, passwords, private keys, certificates or provider tokens.
-2. Never approve the Android VPN consent dialog on the user's behalf.
-3. Never silently disconnect or replace another active VPN. Android's own VPN app/system controls own that operation.
-4. Do not enable Always-on or Block connections without VPN automatically; those settings can cut off internet access when the VPN fails.
-5. Do not silently change WSA Local network access, Windows firewall, Windows routes, DNS or host VPN configuration.
-6. A successful settings launch does not prove a VPN tunnel is connected.
-7. Explain that Windows desktop traffic is outside the Android VPN tunnel.
-8. Compatibility must be tested with actual providers. A client using unsupported drivers, proprietary components or unsupported Android APIs may not work in WSA.
+2. Never approve Android VPN consent on the user's behalf.
+3. Never silently disconnect or replace another active VPN, enable Always-on VPN, or enable Block connections without VPN.
+4. Do not silently change WSA Local network access, Windows firewall, Windows routes, DNS or host VPN configuration.
+5. A successful settings launch or provider-app launch does not prove a tunnel is connected. The initial UI deliberately does not display a connected state.
+6. Explain that Windows desktop traffic is outside the Android VPN tunnel.
+7. Treat a service declaration as a discovery signal, not a guarantee that every provider feature works under WSA.
+8. Validate package names before embedding them in shell commands.
 
-## Future implementation
+## Remaining work and validation
 
-- Discover Android services that declare the `android.net.VpnService` intent action, using an Android PackageManager query or a tested ADB equivalent.
-- Show a provider-neutral list of installed VPN-capable apps with package name and launch action where safely available.
-- Add a launch action that opens the selected VPN client, leaving connect/disconnect controls and authentication in that client.
-- Detect active VPN state only through a verified Android API or robustly tested system interface; do not rely on brittle, version-specific `dumpsys` text without tests.
-- Show **Connected**, **Disconnected**, or **Unknown** only when evidence supports the state.
-- Provide recovery guidance for unsupported VPNs, WSA networking mode conflicts and DNS/routing failures.
-- Test at least two independent VPN implementations in real WSA, including first-use permission, reconnect, disconnect, app switching and WSA restart.
+- Verify that the Package Manager query works across supported WSA community images and provide a clear fallback when the command is unavailable.
+- Verify discovered service declarations also have the required `BIND_VPN_SERVICE` permission where Android exposes that metadata safely.
+- Add provider display names and icons only through a reliable Android metadata source.
+- Test at least two independent VPN implementations on a real WSA installation, including first-use consent, connect, disconnect, WSA restart and provider switching.
+- Test WSA networking-mode interactions and record provider-specific compatibility limitations.
+- Add a Connected/Disconnected/Unknown indicator only after the underlying Android system signal is validated on supported WSA builds. Never infer active tunnel state from a running app or a successful launch command.
 
 ## Acceptance criteria
 
-- A user can install any compatible VPN APK with PacMan.
-- PacMan exposes Android's VPN settings without a MystNodes-specific dependency.
-- The installed client can request Android's normal first-use consent and establish its own VPN service.
-- A second VPN app is not silently started over an existing VPN.
-- PacMan makes no claim that Windows desktop traffic is protected by the Android VPN.
-- No credentials or security settings are changed or stored by PacMan.
-- Provider compatibility and real-WSA verification are documented.
+- Compatible Android VPN apps installed in WSA can be discovered and opened from PacMan without provider-specific code.
+- Android shows and controls the normal VPN consent flow.
+- Provider apps own login, configuration and connection state.
+- PacMan does not claim Windows desktop traffic is protected.
+- PacMan does not collect credentials or change network/security settings.
+- Discovery, launch and fallback behaviour are covered by tests and real WSA validation.
