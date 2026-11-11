@@ -108,6 +108,7 @@ The Windows workflow also validates the PowerShell runtime helper and installer 
 - [Windows CI guide](docs/CI.md) — workflow triggers, validation steps and build artifact handling.
 - [VPN support](docs/VPN_SUPPORT.md) — provider discovery, Android consent, WSA scope and safety.
 - [MystNodes WSA compatibility plan](docs/MYSTNODES_WSA_COMPATIBILITY_PLAN.md) — investigation plan for the selected MystNodes app's VPN permission hand-off and app exit.
+- PacMan's **Capture MystNodes diagnostic** report gathers installed package/service details and recent filtered Android logs locally; it does not clear logs or upload them.
 - [Contributing guide](CONTRIBUTING.md) — local checks, branch and pull request standards.
 - [Security policy](SECURITY.md) — how to report a vulnerability privately.
 
