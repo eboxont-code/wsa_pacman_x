@@ -16,10 +16,8 @@ String buildAndroidVpnSettingsCommand() =>
 /// Safe Android-only fallback when a WSA image lacks the VPN settings activity.
 String buildAndroidSettingsFallbackCommand() =>
     "am start -n 'com.android.settings/.Settings'";
-///
-/// Android apps expose VPN capability by declaring a service that handles the
-/// `android.net.VpnService` intent action. The Android system, not PacMan,
-/// remains responsible for VPN consent and tunnel lifecycle.
+
+/// An installed Android application with a declared VPN service.
 class VpnProvider {
   const VpnProvider({
     required this.packageName,
