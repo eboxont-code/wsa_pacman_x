@@ -113,13 +113,14 @@ void main() {
     test('caps oversized reports', () {
       final report = buildMystNodesDiagnosticReport(
         capturedAt: DateTime.utc(2026, 11, 11),
-        commands: [
-          MystNodesDiagnosticCommandResult(
-            label: 'Large output',
+        commands: List.generate(
+          50,
+          (index) => MystNodesDiagnosticCommandResult(
+            label: 'Command result $index',
             exitCode: 0,
-            stdout: List.filled(30000, 'A').join(),
+            stdout: List.filled(600, 'A').join(),
           ),
-        ],
+        ),
       );
 
       expect(report.length, lessThanOrEqualTo(28020));
