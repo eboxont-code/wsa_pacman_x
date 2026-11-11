@@ -108,7 +108,7 @@ class _VpnManagementPanelState extends State<VpnManagementPanel> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = AppLocalizations.of(context)!.wsa_vpn_discovery_failed;
+        _error = AppLocalizations.of(context)!.wsa_mystnodes_capture_failed;
       });
     } finally {
       if (mounted) {
