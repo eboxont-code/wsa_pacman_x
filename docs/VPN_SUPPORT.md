@@ -51,7 +51,9 @@ The selected MystNodes app is `network.mysterium.provider`. Current upstream sou
 
 ## All-Android-app VPN configuration
 
-For one provider to cover the Android apps in WSA, users connect the provider app, then select it in Android VPN settings and enable **Always-on VPN**. Enabling **Block connections without VPN** applies Android lockdown: apps cannot fall back to the ordinary Android network when the tunnel is down. Provider-level split-tunnel or per-app exclusions must also be reviewed because PacMan cannot override a provider's own routing choices. These controls apply to the WSA Android user only; Windows desktop traffic is outside this VPN.
+For a **conventional full-tunnel VPN client**, Android can apply one selected VPN to apps in the WSA Android user. After connecting the provider, users may choose **Always-on VPN** and **Block connections without VPN** if the provider supports and recommends them. Review provider-level split-tunnel or per-app exclusions; PacMan cannot override those routing choices. These controls apply to the WSA Android user only; Windows desktop traffic is outside this VPN.
+
+**MystNodes is the selected bandwidth-sharing node app, not assumed to be a conventional full-tunnel VPN client.** Its VPN permission prompt alone does not establish that Always-on VPN or lockdown is appropriate. Do not recommend either setting for MystNodes unless MystNodes documents that configuration.
 
 ## Remaining work and validation
 
