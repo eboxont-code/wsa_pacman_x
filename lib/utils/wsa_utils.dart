@@ -178,7 +178,7 @@ class WSAUtils {
     );
     await capture(
       'Recent MystNodes VPN-consent, policy and app-lifecycle logs (filtered)',
-      String.raw`logcat -d -v threadtime -t 4000 | grep -i -E 'network\\.mysterium\\.provider|MystNodes|VpnService|VpnManager|VpnDialogs|VpnConfirm|com\\.android\\.vpndialogs|ConfirmDialog|BIND_VPN_SERVICE|no_config_vpn|DISALLOW_CONFIG_VPN|AndroidRuntime|FATAL EXCEPTION|Permission Denial|SecurityException|DevicePolicyManager|ActivityTaskManager|ActivityManager|ActivityResult|resultCode' | tail -n 180`,
+      r'''logcat -d -v threadtime -t 4000 | grep -i -E 'network\.mysterium\.provider|MystNodes|VpnService|VpnManager|VpnDialogs|VpnConfirm|com\.android\.vpndialogs|ConfirmDialog|BIND_VPN_SERVICE|no_config_vpn|DISALLOW_CONFIG_VPN|AndroidRuntime|FATAL EXCEPTION|Permission Denial|SecurityException|DevicePolicyManager|ActivityTaskManager|ActivityManager|ActivityResult|resultCode' | tail -n 180'',
       maxOutputCharacters: 7000,
     );
 
