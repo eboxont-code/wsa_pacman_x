@@ -204,6 +204,20 @@ void main() {
     });
   });
 
+  group('Android package UID extraction', () {
+    test('reads UID from package list and package dump output', () {
+      expect(
+        extractAndroidPackageUid('package:com.android.vpndialogs uid:10026'),
+        10026,
+      );
+      expect(
+        extractAndroidPackageUid('userId=10072'),
+        10072,
+      );
+      expect(extractAndroidPackageUid('package has no UID metadata'), isNull);
+    });
+  });
+
   group('MystNodes diagnostic assessment', () {
     test('identifies a missing installed VPN service and unattributed restriction', () {
       final assessment = buildMystNodesDiagnosticAssessment([
@@ -248,6 +262,45 @@ void main() {
 
       expect(assessment, contains('is inconclusive'));
       expect(assessment, isNot(contains('correctly excluding it')));
+    });
+
+    test('flags different VPN dialog and MystNodes UIDs without recommending a bypass', () {
+      final assessment = buildMystNodesDiagnosticAssessment([
+        const MystNodesDiagnosticCommandResult(
+          label: 'Android VPN consent package UID (read-only)',
+          exitCode: 0,
+          stdout: 'package:com.android.vpndialogs uid:10026',
+        ),
+        const MystNodesDiagnosticCommandResult(
+          label: 'Installed MystNodes package UID (read-only)',
+          exitCode: 0,
+          stdout: 'package:network.mysterium.provider uid:10072',
+        ),
+        const MystNodesDiagnosticCommandResult(
+          label: 'Android VPN consent package identity and CONTROL_VPN permission (read-only)',
+          exitCode: 0,
+          stdout: 'userId=10026\nprivateFlags=[SYSTEM PRIVILEGED]\n'
+              'android.permission.CONTROL_VPN: granted=true',
+        ),
+      ]);
+
+      expect(assessment, contains('VPN confirmation package UID (10026) differs from the MystNodes UID (10072)'));
+      expect(assessment, contains('No shared-user entry was visible'));
+      expect(assessment, contains('CONTROL_VPN is reported true'));
+      expect(assessment, contains('Do not change package ownership or bypass Android consent'));
+    });
+
+    test('does not speculate when either package UID is unavailable', () {
+      final assessment = buildMystNodesDiagnosticAssessment([
+        const MystNodesDiagnosticCommandResult(
+          label: 'Android VPN consent package UID (read-only)',
+          exitCode: 0,
+          stdout: 'package:com.android.vpndialogs uid:10026',
+        ),
+      ]);
+
+      expect(assessment, contains('could not both be parsed'));
+      expect(assessment, isNot(contains('VPN confirmation package UID (10026) differs')));
     });
 
     test('reports the separate VPN consent package and UID exception', () {
