@@ -291,6 +291,20 @@ String selectMystNodesApkManifestServiceEntries(
       'Service declarations:\n$detail';
 }
 
+/// Extracts the Android package UID from `pm list packages -U` or
+/// Package Manager dump output. Returns null when the output is inconclusive.
+int? extractAndroidPackageUid(String output) {
+  final patterns = [
+    RegExp(r'\\buid\\s*:\\s*(\\d+)', caseSensitive: false),
+    RegExp(r'\\buserId\\s*=\\s*(\\d+)', caseSensitive: false),
+  ];
+  for (final pattern in patterns) {
+    final match = pattern.firstMatch(output);
+    if (match != null) return int.tryParse(match.group(1)!);
+  }
+  return null;
+}
+
 /// Summarises the read-only report without guessing at an unresolved root cause.
 String buildMystNodesDiagnosticAssessment(
   List<MystNodesDiagnosticCommandResult> commands,
@@ -358,6 +372,49 @@ String buildMystNodesDiagnosticAssessment(
         'Android reports no_config_vpn. The available owner/policy evidence does not fully identify its source, so do not remove or bypass it without a separate, evidence-based review.',
       );
     }
+  }
+
+  final dialogUidResult = findResult(
+    'Android VPN consent package UID (read-only)',
+  );
+  final mystNodesUidResult = findResult(
+    'Installed MystNodes package UID (read-only)',
+  );
+  final dialogUid = dialogUidResult == null
+      ? null
+      : extractAndroidPackageUid(dialogUidResult.stdout);
+  final mystNodesUid = mystNodesUidResult == null
+      ? null
+      : extractAndroidPackageUid(mystNodesUidResult.stdout);
+  if (dialogUid != null && mystNodesUid != null) {
+    if (dialogUid != mystNodesUid) {
+      final dialogIdentity = findResult(
+        'Android VPN consent package identity and CONTROL_VPN permission (read-only)',
+      );
+      final identityText = dialogIdentity?.stdout.toLowerCase() ?? '';
+      final sharedUser = RegExp(
+        r'shareduser(?:id)?\\s*[=:]\\s*[^\\s]+',
+        caseSensitive: false,
+      ).hasMatch(identityText);
+      final controlVpnMentioned = identityText.contains('control_vpn');
+      final controlDetail = !controlVpnMentioned
+          ? 'This capture did not expose a CONTROL_VPN permission entry.'
+          : 'The package dump includes a CONTROL_VPN permission entry; verify its grant state before attributing the issue.';
+      final sharedDetail = sharedUser
+          ? 'A shared-user entry is present in the package dump.'
+          : 'No shared-user entry was visible in the package dump.';
+      findings.add(
+        'The VPN confirmation package UID ($dialogUid) differs from the MystNodes UID ($mystNodesUid). The earlier AppOps package/UID exception is consistent with the confirmation path checking MystNodes while running under the dialog package identity. $sharedDetail $controlDetail Do not change package ownership or bypass Android consent; confirm the installed WSA component identity and permission grant first.',
+      );
+    } else {
+      findings.add(
+        'The VPN confirmation package and MystNodes report the same UID ($dialogUid); this capture does not support a distinct-package-UID explanation for the earlier AppOps exception.',
+      );
+    }
+  } else if (dialogUidResult != null || mystNodesUidResult != null) {
+    findings.add(
+      'The VPN confirmation package and MystNodes UIDs could not both be parsed. The dialog/package identity question remains inconclusive.',
+    );
   }
 
   final logs = findResult(
