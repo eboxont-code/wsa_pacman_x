@@ -1,6 +1,6 @@
 # MystNodes compatibility and crash investigation plan for WSA PacMan
 
-**Status:** Execution authorised by the user. The first read-only WSA diagnostic report has been received and reviewed. No WSA setting, Windows network setting or MystNodes app data has been changed. The confirmed findings and remaining evidence gaps are recorded below.  
+**Status:** Execution authorised by the user. Two read-only WSA diagnostic reports have been received and reviewed. The restriction and VPN-dialog identity failure are documented; installed APK manifest inspection is being added to PacMan. No WSA setting, Windows network setting or MystNodes app data has been changed.  
 **Chosen application:** MystNodes Android app.  
 **Package identifier supplied for the installed app:** `network.mysterium.provider`.  
 **Scope:** Make this exact MystNodes app operate reliably inside the user's existing Windows Subsystem for Android (WSA) installation, with PacMan assisting diagnosis and launch. No replacement application is in scope.
@@ -57,6 +57,31 @@ Observed facts:
 - The log excerpt was truncated at 9,000 characters before the final permission callback can be confirmed. The next capture should prioritise the consent component, MystNodes permission-result events, device-policy owner/restriction details and the full package service list.
 
 Interpretation: the WSA user-restriction state is a plausible VPN-start blocker, and the lack of any discoverable `VpnService` is a separate compatibility concern. Both must be resolved or explained before a permission prompt can be treated as a working MystNodes node. The compatible ABI and functioning Android consent component are useful positives. Do not reinstall or clear MystNodes data, enable Always-on/lockdown, change Windows networking, root WSA or patch the APK as a speculative first response.
+
+## 1C. Findings from the second WSA diagnostic report (2026-11-11 23:58 local)
+
+The second read-only report confirms the user restriction state and captures the VPN-dialog failure more closely.
+
+**Restriction ownership and source**
+- Android user 0 is the primary full SYSTEM user. The report says there is no profile owner.
+- `cmd device_policy list-owners` returned `no owners`.
+- `dumpsys user` shows device-policy global restrictions `null` and device-policy local restrictions `none`, while `no_config_vpn` remains in the user's `Restrictions` and `Effective restrictions` sections.
+- Therefore no device-owner/profile-owner admin was found that could ordinarily remove this restriction. The report does not identify whether it is injected by the WSA Android image, its user provisioning/defaults, or another system layer. Do not attribute it more specifically without evidence and do not clear it with shell commands.
+
+**VPN confirmation flow and framework error**
+- The log records ActivityTaskManager starting `com.android.vpndialogs/.ConfirmDialog` from MystNodes' process/UID (`10072`), then starting the VpnDialogs process (`u0a26`, UID `10026`).
+- Immediately afterwards, AppOps logs a `SecurityException`: `network.mysterium.provider` does not belong to UID `10026`. Its stack includes `Vpn.isVpnServicePreConsented` and `VpnManagerService.prepareVpn`.
+- The Android open-source confirmation-dialog implementation checks the existing VPN authorization first, and if the request is not already prepared it checks `DISALLOW_CONFIG_VPN`; when that restriction is set it finishes without presenting the user approval dialog. See [AOSP ConfirmDialog.java](https://android.googlesource.com/platform/frameworks/base/%2B/master/packages/VpnDialogs/src/com/android/vpndialogs/ConfirmDialog.java).
+- AOSP's VPN code checks the caller UID together with the package name for the VPN AppOp. The report's AppOps error shows that the pair reaching the check in this WSA instance is inconsistent: VpnDialogs UID `10026` is being checked against MystNodes' package. See [AOSP Vpn.java](https://android.googlesource.com/platform/frameworks/base/%2B/master/services/core/java/com/android/server/connectivity/Vpn.java).
+- This establishes a failure inside the Android/WSA VPN-consent hand-off, rather than a PacMan launcher failure or a MystNodes native crash. It does not yet establish why the WSA framework supplied the dialog UID to that AppOps package check.
+- The subsequent MystNodes process exit is still recorded as `USER REQUESTED` / `KILL BACKGROUND`; no native crash reason was reported.
+
+**Remaining package question**
+- The current upstream MystNodes app manifest declares `network.mysterium.node.core.NodeService`. The node module's visible manifest does not explicitly declare an Android `VpnService`; the app builds with the separately published `provider-mobile-node` AAR (currently 1.38.1 upstream), which may contribute merged manifest entries.
+- The installed Package Manager query still reports no app with the `android.net.VpnService` action. The filtered package dump was not sufficient to inspect the installed APK's merged manifest, so do not yet conclude that MystNodes lacks the service.
+- The next PacMan diagnostic build inspects the installed base APK's manifest using the bundled AAPT2 tool. It temporarily copies only the installed base APK to a local Windows temporary folder for the read-only manifest dump, deletes that temporary folder, and does not modify or upload the APK or app data.
+
+**Current interpretation:** the VPN consent route is blocked by the WSA Android restriction and shows an additional package/UID identity error in the framework path. The actual service declaration is still unconfirmed. No system restriction, WSA security setting, Android app data or Windows network configuration has been changed.
 
 ## 2. Goal and boundaries
 
@@ -182,6 +207,8 @@ Do not mark the work complete based on a code build alone. Test the exact MystNo
 
 ## 10. Execution and approval boundary
 
-The user has explicitly authorised execution by saying **"let's go"**. The current implementation adds a local PacMan diagnostic report; it does not automatically collect logs in the background, upload reports, clear logcat, install/update MystNodes, alter app data or change WSA/Windows settings.
+The user has explicitly authorised execution by saying **"let's go"**. PacMan's diagnostic report is local and on-demand. The second-stage report has now identified the user restriction state and the AppOps UID/package mismatch in the Android VPN consent path.
 
-Next: build and test the PacMan diagnostic feature, let the user install that build, then ask them to reproduce once and copy the report from PacMan. Review the report before any change to MystNodes or WSA. Any destructive action, app-data reset, APK modification, security change or WSA networking change still requires a separate, explicit explanation and approval.
+The next PacMan update adds read-only inspection of the installed MystNodes base APK manifest: PacMan temporarily pulls only `base.apk` to a local Windows temporary folder, runs the bundled AAPT2 tool to read `AndroidManifest.xml`, records service declarations, then deletes the temporary folder. It does not install, modify or upload the APK, and it does not read or alter MystNodes app data.
+
+Next: pass the full Flutter and Windows packaging workflow, merge the tested change, and let the user install the new PacMan diagnostic build. The resulting report must establish whether the installed APK declares a service protected by `BIND_VPN_SERVICE` with the `android.net.VpnService` action. Any attempt to remove `no_config_vpn`, alter WSA security/framework files, patch or replace MystNodes, reset app data, or change Windows/WSA networking requires a separate explicit explanation and approval.

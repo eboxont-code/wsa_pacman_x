@@ -185,6 +185,94 @@ String selectMystNodesPackageServiceMetadata(
   );
 }
 
+/// Finds the base APK path returned by `pm path` without trusting arbitrary
+/// command output as a local or remote path.
+bool isSafeMystNodesBaseApkPath(String path) =>
+    path.startsWith('/data/app/') &&
+    path.endsWith('/base.apk') &&
+    !path.contains('..') &&
+    !RegExp(r'[\s\x00]').hasMatch(path);
+
+String? extractMystNodesBaseApkPath(String packagePathOutput) {
+  for (final rawLine in packagePathOutput.split(RegExp(r'\r?\n'))) {
+    final line = rawLine.trim();
+    if (!line.startsWith('package:')) continue;
+    final path = line.substring('package:'.length).trim();
+    if (isSafeMystNodesBaseApkPath(path)) return path;
+  }
+  return null;
+}
+
+/// Summarises the merged AndroidManifest.xml extracted from the installed
+/// MystNodes base APK by AAPT2. The output deliberately distinguishes a
+/// successfully parsed manifest with no service elements from an AAPT2 error
+/// or output format that could not be recognised.
+String selectMystNodesApkManifestServiceEntries(
+  String xmlTreeOutput, {
+  int maxLines = 140,
+}) {
+  final lines = xmlTreeOutput.split(RegExp(r'\r?\n'));
+  final hasManifest = lines.any(
+    (line) => RegExp(r'^\s*E:\s+manifest(?:\s|$)', caseSensitive: false)
+        .hasMatch(line),
+  );
+  final hasApplication = lines.any(
+    (line) => RegExp(r'^\s*E:\s+application(?:\s|$)', caseSensitive: false)
+        .hasMatch(line),
+  );
+  if (!hasManifest || !hasApplication) {
+    return '[AAPT2 output did not contain a recognisable manifest and application tree; service declarations are inconclusive.]';
+  }
+
+  final serviceHeader = RegExp(
+    r'^(\s*)E:\s+service(?:\s|$)',
+    caseSensitive: false,
+  );
+  final serviceStarts = <int>[];
+  for (var i = 0; i < lines.length; i++) {
+    if (serviceHeader.hasMatch(lines[i])) serviceStarts.add(i);
+  }
+  if (serviceStarts.isEmpty) {
+    return 'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml.\n'
+        'Declared Android service elements: 0.\n'
+        'No <service> element is declared in this base APK manifest.';
+  }
+
+  final selected = <int>{};
+  final serviceSibling = RegExp(
+    r'^\s*E:\s+(?:activity|activity-alias|meta-data|provider|receiver|service)(?:\s|$)',
+    caseSensitive: false,
+  );
+  for (final start in serviceStarts) {
+    final header = serviceHeader.firstMatch(lines[start])!;
+    final indent = header.group(1)!.length;
+    selected.add(start);
+    for (var i = start + 1; i < lines.length; i++) {
+      final sibling = serviceSibling.firstMatch(lines[i]);
+      if (sibling != null && sibling.group(0)!.indexOf('E:') <= indent) {
+        break;
+      }
+      selected.add(i);
+    }
+  }
+
+  final allServiceText = selected.toList()..sort();
+  final serviceText = allServiceText.map((index) => lines[index]).join('\n');
+  final hasVpnAction = serviceText.contains('android.net.VpnService');
+  final hasBindingPermission = serviceText.contains('android.permission.BIND_VPN_SERVICE');
+  final bounded = allServiceText.length > maxLines
+      ? allServiceText.sublist(0, maxLines)
+      : allServiceText;
+  final detail = sanitizeMystNodesDiagnosticText(
+    bounded.map((index) => lines[index]).join('\n'),
+  );
+  return 'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml.\n'
+      'Declared Android service elements: ${serviceStarts.length}.\n'
+      'A declared service contains the android.net.VpnService action: ${hasVpnAction ? 'yes' : 'no'}.\n'
+      'A declared service uses android.permission.BIND_VPN_SERVICE: ${hasBindingPermission ? 'yes' : 'no'}.\n'
+      'Service declarations:\n$detail';
+}
+
 String buildMystNodesDiagnosticReport({
   required DateTime capturedAt,
   required List<MystNodesDiagnosticCommandResult> commands,
@@ -194,7 +282,7 @@ String buildMystNodesDiagnosticReport({
     ..writeln('Captured: ${capturedAt.toUtc().toIso8601String()}')
     ..writeln('Target package: $mystNodesPackageName')
     ..writeln('Mode: read-only; existing Android logs were not cleared.')
-    ..writeln('Privacy: this report is local. Review it before sharing.')
+    ..writeln('Privacy: local report only. The base APK is temporarily copied for manifest inspection, then deleted; it is not uploaded.')
     ..writeln();
 
   for (final command in commands) {
