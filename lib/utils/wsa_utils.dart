@@ -118,7 +118,7 @@ class WSAUtils {
     );
     await capture(
       'Installed MystNodes package and merged component metadata',
-      'dumpsys package $mystNodesPackageName',
+      "dumpsys package $mystNodesPackageName | grep -i -C 5 -E 'versionName|versionCode|VpnService|BIND_VPN_SERVICE|NodeService'",
       maxOutputCharacters: 6500,
     );
     await capture(
