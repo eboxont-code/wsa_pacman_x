@@ -5,7 +5,7 @@ void main() {
   group('limitMystNodesDiagnosticSection', () {
     test('sanitizes and bounds large command output', () {
       final limited = limitMystNodesDiagnosticSection(
-        'token=private-value\n' + ('A' * 2000),
+        'token=private-value\n' + List.filled(2000, 'A').join(),
         maxCharacters: 500,
       );
 
@@ -17,12 +17,16 @@ void main() {
 
   group('MystNodes diagnostic log selection', () {
     test('keeps VPN, MystNodes and Android activity lifecycle context', () {
+      final trailingNoise = List.generate(
+        15,
+        (index) => '01-01 10:00:1${index.toString().padLeft(2, '0')}.000 I/OtherApp: trailing noise $index',
+      ).join('\\n');
       final filtered = selectMystNodesRelevantLogLines(
-        '01-01 10:00:00.000 I/OtherApp: unrelated\n'
-        '01-01 10:00:01.000 I/ActivityTaskManager: START cmp=com.android.vpndialogs/.ConfirmDialog\n'
-        '01-01 10:00:02.000 I/MystNodes: launching VPN consent\n'
-        '01-01 10:00:03.000 W/ActivityManager: Finishing activity network.mysterium.provider/.MainActivity\n'
-        '01-01 10:00:04.000 I/OtherApp: unrelated again\n',
+        '01-01 10:00:00.000 I/OtherApp: nearby context\\n'
+        '01-01 10:00:01.000 I/ActivityTaskManager: START cmp=com.android.vpndialogs/.ConfirmDialog\\n'
+        '01-01 10:00:02.000 I/MystNodes: launching VPN consent\\n'
+        '01-01 10:00:03.000 W/ActivityManager: Finishing activity network.mysterium.provider/.MainActivity\\n'
+        '$trailingNoise',
       );
 
       expect(filtered, contains('com.android.vpndialogs'));
