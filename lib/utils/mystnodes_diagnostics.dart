@@ -397,7 +397,7 @@ String buildMystNodesDiagnosticAssessment(
         caseSensitive: false,
       ).hasMatch(identityText);
       final controlVpnGrant = RegExp(
-        r'CONTROL_VPN\\s*:\\s*granted=(true|false)',
+        r'CONTROL_VPN\s*:\s*granted=(true|false)',
         caseSensitive: false,
       ).firstMatch(identityText);
       final controlDetail = controlVpnGrant == null
