@@ -1,6 +1,6 @@
 # MystNodes compatibility and crash investigation plan for WSA PacMan
 
-**Status:** Execution authorised by the user. Current work is read-only diagnosis support and PacMan diagnostic tooling; no WSA setting, Windows network setting or MystNodes app data has been changed.  
+**Status:** Execution authorised by the user. The first read-only WSA diagnostic report has been received and reviewed. No WSA setting, Windows network setting or MystNodes app data has been changed. The confirmed findings and remaining evidence gaps are recorded below.  
 **Chosen application:** MystNodes Android app.  
 **Package identifier supplied for the installed app:** `network.mysterium.provider`.  
 **Scope:** Make this exact MystNodes app operate reliably inside the user's existing Windows Subsystem for Android (WSA) installation, with PacMan assisting diagnosis and launch. No replacement application is in scope.
@@ -39,6 +39,23 @@ Relevant upstream source:
 - [Android dependency versions](https://github.com/mysteriumnetwork/mysterium-mobile-provider/blob/master/android/gradle/libs.versions.toml)
 
 The current upstream app Gradle file declares package `network.mysterium.provider`, version name `5.2.2`, version code `11`, and depends on the separately released `provider-mobile-node` library, currently version `1.38.1` in that source tree. The app manifest and node-module manifest do not themselves show an explicit `VpnService` declaration; the prebuilt node AAR may contribute merged manifest components. **Do not conclude that the installed APK lacks the service from source manifests alone.** The user's actual installed app version and merged Package Manager service declarations must be read from WSA.
+
+## 1B. Findings from the installed WSA diagnostic report (2026-11-11)
+
+The user's PacMan diagnostic report was captured at 2026-11-11 22:49:43 local time (UTC timestamp in the report: 12:49:43Z). It is read-only and did not clear logs or change settings.
+
+Observed facts:
+
+- Android release 13, SDK level 33, device ABI `x86_64`. Supported ABI list includes x86_64 and arm64-v8a. The installed MystNodes package reports `primaryCpuAbi=x86_64`, so the host ABI is not the obvious blocker.
+- Installed package is `network.mysterium.provider`, version name `5.2.2`, version code `11`, target SDK `37`.
+- `com.android.vpndialogs` is installed, and `com.android.vpndialogs/.ConfirmDialog` resolves successfully.
+- `settings get secure always_on_vpn_app` returned `null`; there is no configured Always-on VPN package.
+- The user-restriction output includes `no_config_vpn`. Android documents that this restriction prevents ordinary VPN apps from starting on Android 7+ when it is enforced by a device owner or profile owner. The report did not identify the owner/source. Do not call this a proven WSA-owned restriction until device-policy details are captured, and do not attempt an unapproved system-policy change. Reference: [Android UserManager — DISALLOW_CONFIG_VPN](https://developer.android.com/reference/android/os/UserManager#DISALLOW_CONFIG_VPN).
+- The supported device-wide Package Manager query for `android.net.VpnService` returned `No services found`. The filtered MystNodes package dump showed no match for `VpnService`, `BIND_VPN_SERVICE` or `NodeService`. Android's documented VPN integration requires a declared service protected by `BIND_VPN_SERVICE` and an intent filter for `android.net.VpnService` ([Android VPN developer guide](https://developer.android.com/develop/connectivity/vpn)). This establishes that WSA currently exposes no service matching the standard VPN-service action. Inspect the complete installed package service section / merged APK manifest before attributing the missing declaration to MystNodes specifically.
+- Process-exit history shows repeated `USER REQUESTED` / `KILL BACKGROUND` exits, not an Android crash reason. This matches the reviewed upstream MystNodes error path that deliberately closes its task after a denied VPN-permission result; it does not by itself prove a crash.
+- The log excerpt was truncated at 9,000 characters before the final permission callback can be confirmed. The next capture should prioritise the consent component, MystNodes permission-result events, device-policy owner/restriction details and the full package service list.
+
+Interpretation: the WSA user-restriction state is a plausible VPN-start blocker, and the lack of any discoverable `VpnService` is a separate compatibility concern. Both must be resolved or explained before a permission prompt can be treated as a working MystNodes node. The compatible ABI and functioning Android consent component are useful positives. Do not reinstall or clear MystNodes data, enable Always-on/lockdown, change Windows networking, root WSA or patch the APK as a speculative first response.
 
 ## 2. Goal and boundaries
 
