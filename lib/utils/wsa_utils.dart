@@ -117,6 +117,30 @@ class WSAUtils {
       'pm path $mystNodesPackageName',
     );
     await capture(
+      'Android system VPN consent package APK paths',
+      'pm path com.android.vpndialogs',
+    );
+    await capture(
+      'Android VPN consent component registration and enabled state',
+      "dumpsys package com.android.vpndialogs | grep -i -C 4 -E 'enabled|ConfirmDialog|VpnConfirm|versionName'",
+      maxOutputCharacters: 3500,
+    );
+    await capture(
+      'Android VPN consent activity resolution',
+      'cmd package resolve-activity --brief -n com.android.vpndialogs/.ConfirmDialog',
+      maxOutputCharacters: 1500,
+    );
+    await capture(
+      'Existing Android Always-on VPN package (read-only)',
+      'settings get secure always_on_vpn_app',
+      maxOutputCharacters: 500,
+    );
+    await capture(
+      'Android VPN configuration restrictions (read-only)',
+      "dumpsys user | grep -i -C 2 -E 'no_config_vpn|DISALLOW_CONFIG_VPN'",
+      maxOutputCharacters: 1500,
+    );
+    await capture(
       'Installed MystNodes package and merged component metadata',
       "dumpsys package $mystNodesPackageName | grep -i -C 5 -E 'versionName|versionCode|VpnService|BIND_VPN_SERVICE|NodeService'",
       maxOutputCharacters: 6500,
