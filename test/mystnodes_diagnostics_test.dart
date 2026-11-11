@@ -121,6 +121,27 @@ void main() {
       );
     });
 
+    test('accepts real base APK paths containing ordinary s, x and zero characters', () {
+      expect(
+        isSafeMystNodesBaseApkPath(
+          '/data/app/~~1dVjClL6w1OL-seQs6QjiQ==/network.mysterium.provider-ptZNJJYqSJ3jbxkbmS-oPA==/base.apk',
+        ),
+        isTrue,
+      );
+      expect(
+        isSafeMystNodesBaseApkPath('/data/app/x0safe/provider/base.apk'),
+        isTrue,
+      );
+      expect(
+        isSafeMystNodesBaseApkPath('/data/app/../private/base.apk'),
+        isFalse,
+      );
+      expect(
+        isSafeMystNodesBaseApkPath('/data/app/provider name/base.apk'),
+        isFalse,
+      );
+    });
+
     test('reports the exact VPN service declaration from a parsed manifest', () {
       final report = selectMystNodesApkManifestServiceEntries(
         'N: android=http://schemas.android.com/apk/res/android\n'
