@@ -119,8 +119,8 @@ cmd package query-services --brief --components -a android.net.VpnService
 
 Verify whether the exact command is supported by this WSA Android build and inspect its raw stdout/stderr and exit code.
 
-- Compare supported `cmd package` / `pm` query forms for the installed Android version.
-- Inspect `dumpsys package network.mysterium.provider` for declared services and intent filters if the query is unavailable or returns nothing.
+- Use the supported device-wide query form `cmd package query-services --brief --components -a android.net.VpnService`; Android's PackageManager shell query does not offer a `-p PACKAGE` package filter for this command.
+- Inspect `dumpsys package network.mysterium.provider` for declared services, permissions and intent filters; do not treat an unsupported query or an empty output as proof that the package lacks a VPN service.
 - Distinguish **query unsupported**, **query failed**, **no matching service**, and **service found but not launchable**. Do not collapse these states into "no VPN apps found".
 - If the service exists, validate its component and binding permission before listing it as a VPN provider.
 - Verify PacMan passes the exact package/component to Android without shell injection or guessing.
