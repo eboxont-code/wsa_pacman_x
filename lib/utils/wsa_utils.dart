@@ -137,7 +137,7 @@ class WSAUtils {
           'wsa-pacman-mystnodes-',
         );
         final localApk = File(
-          '${temporaryDirectory.path}\\\\mystnodes-base.apk',
+          '${temporaryDirectory.path}${Platform.pathSeparator}mystnodes-base.apk',
         );
         final pull = await ADBUtils.pullToAddress(
           ipAddress,
@@ -156,7 +156,7 @@ class WSAUtils {
           ));
         } else {
           final manifest = await Process.run(
-            '${Env.TOOLS_DIR}\\\\aapt2.exe',
+            '${Env.TOOLS_DIR}aapt2.exe',
             [
               'dump',
               'xmltree',
