@@ -26,7 +26,7 @@ String sanitizeMystNodesDiagnosticText(String value) {
     caseSensitive: false,
   );
   final sensitiveAssignment = RegExp(
-    r"""((?:password|passphrase|mnemonic|seed phrase|private[_ -]?key|authorization|bearer|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)\s*[:=]\s*)["']?[^\s"',;]+""",
+    r"""((?:password|passphrase|mnemonic|seed phrase|private[_ -]?key|authorization|bearer|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)\s*[:=]\s*)[^\r\n,;]+""",
     caseSensitive: false,
   );
   final urlQuery = RegExp(r'(https?://[^\s?]+)\?[^\s]+');
@@ -124,6 +124,6 @@ String buildMystNodesDiagnosticReport({
   }
 
   final report = buffer.toString();
-  if (report.length <= 24000) return report;
-  return '${report.substring(0, 23970)}\n[Report truncated at 24,000 characters.]';
+  if (report.length <= 28000) return report;
+  return '${report.substring(0, 27970)}\n[Report truncated at 28,000 characters.]';
 }
