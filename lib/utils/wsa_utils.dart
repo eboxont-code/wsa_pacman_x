@@ -145,7 +145,8 @@ class WSAUtils {
           remoteBaseApk,
           localApk.path,
         );
-        if (pull.exitCode != 0 || !await localApk.exists()) {
+        final localApkExists = await localApk.exists();
+        if (pull.exitCode != 0 || !localApkExists) {
           results.add(MystNodesDiagnosticCommandResult(
             label: 'Installed MystNodes APK merged manifest inspection (local temporary copy)',
             exitCode: pull.exitCode == 0 ? -1 : pull.exitCode,
