@@ -187,17 +187,18 @@ String selectMystNodesPackageServiceMetadata(
 
 /// Finds the base APK path returned by `pm path` without trusting arbitrary
 /// command output as a local or remote path.
+bool isSafeMystNodesBaseApkPath(String path) =>
+    path.startsWith('/data/app/') &&
+    path.endsWith('/base.apk') &&
+    !path.contains('..') &&
+    !RegExp(r'[\s\x00]').hasMatch(path);
+
 String? extractMystNodesBaseApkPath(String packagePathOutput) {
   for (final rawLine in packagePathOutput.split(RegExp(r'\r?\n'))) {
     final line = rawLine.trim();
     if (!line.startsWith('package:')) continue;
     final path = line.substring('package:'.length).trim();
-    if (path.startsWith('/data/app/') &&
-        path.endsWith('/base.apk') &&
-        !path.contains('..') &&
-        !RegExp(r'[\s\x00]').hasMatch(path)) {
-      return path;
-    }
+    if (isSafeMystNodesBaseApkPath(path)) return path;
   }
   return null;
 }
