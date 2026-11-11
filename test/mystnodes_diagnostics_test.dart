@@ -284,9 +284,9 @@ void main() {
         ),
       ]);
 
-      expect(assessment, contains('dialog UID (10026) differs from the MystNodes UID (10072)'));
-      expect(assessment, contains('shared-user entry was not visible'));
-      expect(assessment, contains('CONTROL_VPN permission entry'));
+      expect(assessment, contains('VPN confirmation package UID (10026) differs from the MystNodes UID (10072)'));
+      expect(assessment, contains('No shared-user entry was visible'));
+      expect(assessment, contains('CONTROL_VPN is reported true'));
       expect(assessment, contains('Do not change package ownership or bypass Android consent'));
     });
 
@@ -300,7 +300,7 @@ void main() {
       ]);
 
       expect(assessment, contains('could not both be parsed'));
-      expect(assessment, isNot(contains('dialog UID (10026) differs')));
+      expect(assessment, isNot(contains('VPN confirmation package UID (10026) differs')));
     });
 
     test('reports the separate VPN consent package and UID exception', () {
