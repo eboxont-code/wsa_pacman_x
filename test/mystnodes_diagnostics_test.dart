@@ -30,6 +30,7 @@ void main() {
       );
 
       expect(filtered, contains('com.android.vpndialogs'));
+      expect(filtered, contains('ConfirmDialog'));
       expect(filtered, contains('MystNodes'));
       expect(filtered, contains('network.mysterium.provider'));
       expect(filtered, isNot(contains('trailing noise 14')));
