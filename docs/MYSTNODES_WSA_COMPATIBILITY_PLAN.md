@@ -156,6 +156,12 @@ The public distribution channels were checked before considering an APK update o
 - The user's earlier log records that the package `network.mysterium.provider` was checked against caller UID `10026` and rejected because that package belongs to a different UID. This is consistent with the confirmation dialog's pre-consent call path running under a UID different from MystNodes, but the exact WSA component identity and framework implementation still need to be verified from the installed image. Capture both packages' UIDs, the VpnDialogs shared-user identity and its granted VPN-control permission before claiming a definitive framework root cause.
 - This source comparison does not authorize an AppOps override. A grant may skip normal user consent, and it cannot create a missing `VpnService` implementation.
 
+**Vendor description of a MystNode**
+- The official [MystNodes support article](https://help.mystnodes.com/en/articles/8005442-what-will-my-node-be-used-for) explains that other people and VPN services connect through a user's node. This describes the phone as a provider endpoint, not as the VPN client device.
+- The provider's `wireguard` service is a service the node offers to remote clients; its name does not, by itself, imply that the Android host must use `android.net.VpnService` to route the phone's own traffic.
+- In the reviewed public source, the app creates the node with provider options, `Consumer=false`, and calls `StartProvider()`. There is no visible separate consumer-VPN feature in the Android wrapper.
+- Together, the vendor's own description and the code path make the unconditional app-start VPN consent request strongly suggest an obsolete or incorrectly shared consumer-client permission gate. This remains a high-confidence source-based diagnosis, not a confirmed vendor statement; maintainers should confirm and correct it in the signed app.
+
 **Provider initialization and consumer-tunnel integration audit**
 - The MystNodes Android `NodeContainer.kt` creates the Go node with `Mysterium.newNode(context.filesDir.canonicalPath, Mysterium.defaultProviderNodeOptions())`.
 - The public Node library's `DefaultProviderNodeOptions()` sets `IsProvider = true`. In `NewNode(...)`, provider mode sets `nodeOptions.Consumer = false`; it is not initialized as a consumer node.
