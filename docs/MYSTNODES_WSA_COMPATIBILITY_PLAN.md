@@ -128,6 +128,37 @@ The next step is vendor confirmation of whether the official MystNodes 5.2.2 APK
 
 PacMan's next diagnostic update adds a short automated assessment at the top of the report. It requires the VPN action and binding permission to be declared on the same Android service and keeps restriction-source uncertainty explicit.
 
+## 1F. Official vendor distribution and dependency review (2026-11-12)
+
+The public distribution channels were checked before considering an APK update or a custom build.
+
+**Official MystNodes app**
+- The official [Google Play listing](https://play.google.com/store/apps/details?id=network.mysterium.provider) still shows MystNodes version 5.2.2 and an update date of 5 May 2026.
+- The public [mysteriumnetwork/mysterium-mobile-provider repository](https://github.com/mysteriumnetwork/mysterium-mobile-provider) still has app version name 5.2.2 / version code 11 on its current `master` source. Its current version catalog pins `provider-mobile-node 1.38.1`.
+- The latest public source commits for that app repository are dated 5 May 2026. No newer public, vendor-signed MystNodes APK release was found in the official distribution channels reviewed.
+- The official [Android setup guide](https://help.mystnodes.com/en/articles/8165874-getting-started-mystnodes-app-on-android) documents installation and onboarding on Android, but does not document WSA compatibility. This is not proof that WSA is unsupported; it remains a vendor question.
+
+**Node-library version is not an app fix**
+- The vendor app repository has an open [PR #52](https://github.com/mysteriumnetwork/mysterium-mobile-provider/pull/52) whose only changed source file is `android/gradle/libs.versions.toml`, changing the node dependency from `1.38.1` to `1.39.7`. It is not merged and does not itself publish a MystNodes APK or document a VPN-service manifest correction.
+- The Mysterium Node project has since published [node release 1.39.9](https://github.com/mysteriumnetwork/node/releases/tag/1.39.9) on 28 October 2026. Its published release note concerns session validation in `keepAliveLoop`; it does not announce a MystNodes Android VPN-service or WSA-consent fix.
+- The installed MystNodes 5.2.2 merged manifest remains the decisive evidence for the APK in use: four services, none declaring `android.net.VpnService` or `android.permission.BIND_VPN_SERVICE`. A dependency version bump cannot be assumed to add the missing service without inspecting the resulting signed APK.
+
+**Application source audit**
+- The public MystNodes Android source tree contains only two Android manifests: the app manifest and the `android/node` library manifest. Neither declares `android.net.VpnService` or `BIND_VPN_SERVICE`.
+- The public app Kotlin source contains the `VpnService.prepare(context)` call in `LaunchScreen.kt`. The reviewed source tree contains no Java files and no Kotlin class extending `android.net.VpnService`.
+- The app's `NodeService.kt` extends ordinary `android.app.Service`; it starts the Go `MobileNode` provider and refreshes provider service/identity/balance state. It is not an Android VPN service.
+- The public Node repository at tag `1.38.1` contains Go sources for the mobile provider, including `StartProvider`, but no Java/Kotlin sources and no AndroidManifest.xml. Its Android packaging script builds a Go mobile AAR from `./mobile/mysterium`. The checked-in source therefore provides no evidence that the AAR supplies a Java/Kotlin `VpnService` subclass or a manifest service declaration.
+- This creates a concrete vendor question: is the `VpnService.prepare(context)` call a stale/incorrect startup gate in an app that does not implement an Android `VpnService`, or is the vendor missing a required service/class from its public source/build? Do not delete the call or invent a service locally until the vendor confirms the intended architecture. A vendor fix would either remove the unnecessary permission gate from the signed app or add a real service implementation and manifest declaration, depending on intended behaviour.
+
+**Android 13 consent-path source comparison**
+- AOSP Android 13 `ConfirmDialog.onCreate` calls `prepareVpn(mPackage, null, userId)` before showing the prompt.
+- AOSP `Vpn.prepare` then checks pre-consent for that package through `isVpnServicePreConsented`; `doesPackageHaveAppop` passes `Binder.getCallingUid()` alongside the VPN package name to AppOps.
+- The user's earlier log records that the package `network.mysterium.provider` was checked against caller UID `10026` and rejected because that package belongs to a different UID. This is consistent with the confirmation dialog's pre-consent call path running under a UID different from MystNodes, but the exact WSA component identity and framework implementation still need to be verified from the installed image. Capture both packages' UIDs, the VpnDialogs shared-user identity and its granted VPN-control permission before claiming a definitive framework root cause.
+- This source comparison does not authorize an AppOps override. A grant may skip normal user consent, and it cannot create a missing `VpnService` implementation.
+
+**Decision**
+No vendor-signed MystNodes update has been identified that is proven to fix this issue. Do not sideload an unrelated custom build, build/re-sign the vendor app with a different signing key, or replace the current app as an experiment: a different signing identity cannot be treated as a safe in-place update, and uninstalling could jeopardize existing MystNodes data. Request vendor confirmation of the expected merged manifest and WSA support. Separately investigate the WSA `no_config_vpn` restriction and AppOps UID/package mismatch. No security exception or WSA/Windows configuration change is authorised by this review.
+
 ## 2. Goal and boundaries
 
 ### Goal
