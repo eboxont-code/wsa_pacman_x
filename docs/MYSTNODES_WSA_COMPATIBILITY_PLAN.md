@@ -159,6 +159,20 @@ The public distribution channels were checked before considering an APK update o
 **Decision**
 No vendor-signed MystNodes update has been identified that is proven to fix this issue. Do not sideload an unrelated custom build, build/re-sign the vendor app with a different signing key, or replace the current app as an experiment: a different signing identity cannot be treated as a safe in-place update, and uninstalling could jeopardize existing MystNodes data. Request vendor confirmation of the expected merged manifest and WSA support. Separately investigate the WSA `no_config_vpn` restriction and AppOps UID/package mismatch. No security exception or WSA/Windows configuration change is authorised by this review.
 
+## 1G. Read-only VPN confirmation identity diagnostics shipped (2026-11-12)
+
+PacMan now captures the two package identities involved in the earlier Android VPN-consent AppOps error:
+
+- `cmd package list packages -U com.android.vpndialogs`
+- `cmd package list packages -U network.mysterium.provider`
+- A focused `dumpsys package com.android.vpndialogs` excerpt containing `userId`, shared-user metadata, system/privileged flags and the `CONTROL_VPN` permission grant state.
+
+The report compares the UIDs only when both values can be parsed. A different UID is reported as an investigation lead, not a root cause: `com.android.vpndialogs` is a separate Android system package and can legitimately have its own UID. PacMan explicitly says not to change package ownership or bypass Android consent. Missing UID or permission data remains inconclusive.
+
+Implementation: [PR #38](https://github.com/eboxont-code/wsa_pacman_x/pull/38) merged to `main`; [PR workflow build #355](https://github.com/eboxont-code/wsa_pacman_x/actions/runs/43118579235) passed all tests, Windows compilation, installer safety checks, XAPK checks and packaging. The merged `main` commit is `7f2109427911157906f5aac660c4fc782f97af79`. The main-branch build #357 produced and uploaded the Windows installer and portable artifact; the installer compilation and artifact upload are confirmed in the Actions job log. The user must install this build and provide its next local report before actual WSA package identities, shared-user state and `CONTROL_VPN` grant can be verified.
+
+No Android permission, AppOps mode, user restriction, WSA setting, Windows network setting, MystNodes data or APK was modified.
+
 ## 2. Goal and boundaries
 
 ### Goal
