@@ -160,9 +160,32 @@ void main() {
       );
 
       expect(report, contains('Declared Android service elements: 2'));
-      expect(report, contains('android.net.VpnService action: yes'));
-      expect(report, contains('BIND_VPN_SERVICE: yes'));
+      expect(report, contains('At least one declared service contains the android.net.VpnService action: yes.'));
+      expect(report, contains('At least one declared service uses android.permission.BIND_VPN_SERVICE: yes.'));
       expect(report, contains('network.mysterium.node.vpn.NodeVpnService'));
+      expect(report, contains('A single declared service contains both required VPN declarations: yes'));
+    });
+
+    test('does not combine VPN declarations from different service elements', () {
+      final report = selectMystNodesApkManifestServiceEntries(
+        'E: manifest (line=1)\n'
+        '  E: application (line=5)\n'
+        '    E: service (line=10)\n'
+        '      A: android:name(0x01010003)="example.ActionOnlyService"\n'
+        '      E: intent-filter (line=11)\n'
+        '        E: action (line=12)\n'
+        '          A: android:name(0x01010003)="android.net.VpnService"\n'
+        '    E: service (line=20)\n'
+        '      A: android:name(0x01010003)="example.PermissionOnlyService"\n'
+        '      A: android:permission(0x01010006)="android.permission.BIND_VPN_SERVICE"\n',
+      );
+
+      expect(report, contains('At least one declared service contains the android.net.VpnService action: yes.'));
+      expect(report, contains('At least one declared service uses android.permission.BIND_VPN_SERVICE: yes.'));
+      expect(
+        report,
+        contains('A single declared service contains both required VPN declarations: no'),
+      );
     });
 
     test('only reports no services after confirming a parsed manifest tree', () {
@@ -178,6 +201,67 @@ void main() {
       expect(noServices, contains('Declared Android service elements: 0'));
       expect(noServices, contains('No <service> element is declared'));
       expect(unknown, contains('service declarations are inconclusive'));
+    });
+  });
+
+  group('MystNodes diagnostic assessment', () {
+    test('identifies a missing installed VPN service and unattributed restriction', () {
+      final assessment = buildMystNodesDiagnosticAssessment([
+        const MystNodesDiagnosticCommandResult(
+          label: 'Installed MystNodes base APK merged AndroidManifest.xml service declarations (AAPT2)',
+          exitCode: 0,
+          stdout: 'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml.\n'
+              'Declared Android service elements: 4.\n'
+              'At least one declared service contains the android.net.VpnService action: no.\n'
+              'At least one declared service uses android.permission.BIND_VPN_SERVICE: no.\n'
+              'A single declared service contains both required VPN declarations: no.\n',
+        ),
+        const MystNodesDiagnosticCommandResult(
+          label: 'Android user VPN restriction source and context (read-only)',
+          exitCode: 0,
+          stdout: 'Restrictions:\n  no_config_vpn\n'
+              'Device policy global restrictions:\n  null\n'
+              'Device policy local restrictions:\n  none\n',
+        ),
+        const MystNodesDiagnosticCommandResult(
+          label: 'Android device and profile policy owners (read-only)',
+          exitCode: 0,
+          stdout: 'no owners\n',
+        ),
+      ]);
+
+      expect(assessment, contains('does not declare a single service'));
+      expect(assessment, contains('correctly excluding it'));
+      expect(assessment, contains('no_config_vpn'));
+      expect(assessment, contains('restriction source remains unidentified'));
+      expect(assessment, contains('must not patch or re-sign'));
+    });
+
+    test('does not claim a missing service when manifest inspection failed', () {
+      final assessment = buildMystNodesDiagnosticAssessment([
+        const MystNodesDiagnosticCommandResult(
+          label: 'Installed MystNodes base APK merged AndroidManifest.xml service declarations (AAPT2)',
+          exitCode: 1,
+          stderr: 'AAPT2 failed',
+        ),
+      ]);
+
+      expect(assessment, contains('is inconclusive'));
+      expect(assessment, isNot(contains('correctly excluding it')));
+    });
+
+    test('reports the separate VPN consent package and UID exception', () {
+      final assessment = buildMystNodesDiagnosticAssessment([
+        const MystNodesDiagnosticCommandResult(
+          label: 'Recent MystNodes VPN-consent, policy and app-lifecycle logs (filtered)',
+          exitCode: 0,
+          stdout: 'SecurityException: package network.mysterium.provider does not belong to caller uid 10026\n'
+              'Vpn.isVpnServicePreConsented',
+        ),
+      ]);
+
+      expect(assessment, contains('AppOps package/UID SecurityException'));
+      expect(assessment, contains('separate Android/WSA consent-path failure'));
     });
   });
 
@@ -235,6 +319,8 @@ void main() {
       expect(report, contains('Installed MystNodes APK paths'));
       expect(report, contains('Exit code: 127'));
       expect(report, contains('unknown command query-services'));
+      expect(report, contains('Automated assessment (read-only)'));
+      expect(report, contains('VPN-service check is inconclusive'));
     });
 
     test('caps oversized reports', () {
