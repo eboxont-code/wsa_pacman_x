@@ -74,7 +74,7 @@ class WSAUtils {
   }) async {
     final results = <MystNodesDiagnosticCommandResult>[];
 
-    Future<void> capture(
+    Future<String?> capture(
       String label,
       String command, {
       bool filterLogs = false,
@@ -104,12 +104,14 @@ class WSAUtils {
             maxCharacters: 1200,
           ),
         ));
+        return result.exitCode == 0 ? rawStdout : null;
       } catch (error) {
         results.add(MystNodesDiagnosticCommandResult(
           label: label,
           exitCode: -1,
           stderr: error.toString(),
         ));
+        return null;
       }
     }
 
@@ -117,10 +119,88 @@ class WSAUtils {
     await capture('Android SDK level', 'getprop ro.build.version.sdk');
     await capture('Android CPU ABI', 'getprop ro.product.cpu.abi');
     await capture('Android supported ABIs', 'getprop ro.product.cpu.abilist');
-    await capture(
+    final apkPathOutput = await capture(
       'Installed MystNodes APK paths',
       'pm path $mystNodesPackageName',
     );
+    final remoteBaseApk = extractMystNodesBaseApkPath(apkPathOutput ?? '');
+    if (remoteBaseApk == null) {
+      results.add(const MystNodesDiagnosticCommandResult(
+        label: 'Installed MystNodes APK manifest inspection',
+        exitCode: -1,
+        stderr: 'Could not identify a safe base.apk path from Package Manager output; manifest inspection was skipped.',
+      ));
+    } else {
+      Directory? temporaryDirectory;
+      try {
+        temporaryDirectory = await Directory.systemTemp.createTemp(
+          'wsa-pacman-mystnodes-',
+        );
+        final localApk = File(
+          '${temporaryDirectory.path}\\\\mystnodes-base.apk',
+        );
+        final pull = await ADBUtils.pullToAddress(
+          ipAddress,
+          port,
+          remoteBaseApk,
+          localApk.path,
+        );
+        if (pull.exitCode != 0 || !await localApk.exists()) {
+          results.add(MystNodesDiagnosticCommandResult(
+            label: 'Installed MystNodes APK merged manifest inspection (local temporary copy)',
+            exitCode: pull.exitCode == 0 ? -1 : pull.exitCode,
+            stderr: limitMystNodesDiagnosticSection(
+              '${pull.stderr ?? ''} ${pull.stdout ?? ''} APK copy was not available; no manifest was inspected.',
+              maxCharacters: 1600,
+            ),
+          ));
+        } else {
+          final manifest = await Process.run(
+            '${Env.TOOLS_DIR}\\\\aapt2.exe',
+            [
+              'dump',
+              'xmltree',
+              '--file',
+              'AndroidManifest.xml',
+              localApk.path,
+            ],
+          );
+          final manifestOutput = manifest.stdout?.toString() ?? '';
+          results.add(MystNodesDiagnosticCommandResult(
+            label: 'Installed MystNodes base APK merged AndroidManifest.xml service declarations (AAPT2)',
+            exitCode: manifest.exitCode,
+            stdout: limitMystNodesDiagnosticSection(
+              manifest.exitCode == 0
+                  ? selectMystNodesApkManifestServiceEntries(manifestOutput)
+                  : '[AAPT2 could not inspect the installed base APK manifest; service declarations are inconclusive.]',
+              maxCharacters: 6500,
+            ),
+            stderr: limitMystNodesDiagnosticSection(
+              manifest.stderr?.toString() ?? '',
+              maxCharacters: 1600,
+            ),
+          ));
+        }
+      } catch (error) {
+        results.add(MystNodesDiagnosticCommandResult(
+          label: 'Installed MystNodes APK merged manifest inspection (local temporary copy)',
+          exitCode: -1,
+          stderr: 'The local APK manifest inspection could not complete: $error',
+        ));
+      } finally {
+        if (temporaryDirectory != null && await temporaryDirectory.exists()) {
+          try {
+            await temporaryDirectory.delete(recursive: true);
+          } catch (error) {
+            results.add(MystNodesDiagnosticCommandResult(
+              label: 'Temporary MystNodes APK cleanup',
+              exitCode: -1,
+              stderr: 'Temporary APK cleanup needs attention: $error',
+            ));
+          }
+        }
+      }
+    }
     await capture(
       'Android system VPN consent package APK paths',
       'pm path com.android.vpndialogs',
@@ -348,6 +428,16 @@ extension ADBUtils on Future<ProcessResult> {
 
   static Future<ProcessResult> shell(String device, String command) => withDevice(device, 'shell', param: command);
   static Future<ProcessResult> shellToAddress(String ipAddress, int port, String command) => shell(_toName(ipAddress, port), command);
+  static Future<ProcessResult> pullToAddress(
+    String ipAddress,
+    int port,
+    String remotePath,
+    String localPath,
+  ) => _withDevice(
+    _toName(ipAddress, port),
+    'pull',
+    args: [remotePath, localPath],
+  );
   static Future<ProcessResult> shellToWSA(String command) => shell(deviceName, command);
 
   static Future<ProcessResult> push(String device, String inPath, String outPath, {String? workDir}) => _withDevice(device, 'push', args: [inPath, outPath], workDir: workDir);
