@@ -6,7 +6,7 @@ Manage compatible Android VPN clients inside Windows Subsystem for Android (WSA)
 
 ## Implemented
 
-- Open Android's standard VPN settings through the `android.settings.VPN_SETTINGS` intent.
+- Open Android's VPN settings with the explicit `com.android.settings/.Settings$VpnSettingsActivity` component. Do not use the implicit `android.settings.VPN_SETTINGS` intent in WSA because its host integration can redirect the launch to Windows Settings. If the VPN page is unavailable, fall back only to the explicit main Android Settings activity.
 - Discover Android services registered for the `android.net.VpnService` intent using Package Manager.
 - Group discovered service components by package and list the matching package names in PacMan's WSA management page.
 - Launch a selected provider's Android launcher activity through the existing ADB connection.
@@ -38,12 +38,16 @@ This feature controls Android VPN apps and Android app traffic inside WSA only. 
 
 1. Never request or store VPN usernames, passwords, private keys, certificates or provider tokens.
 2. Never approve Android VPN consent on the user's behalf.
-3. Never silently disconnect or replace another active VPN, enable Always-on VPN, or enable Block connections without VPN.
+3. Never silently disconnect or replace another active VPN, or silently enable Always-on VPN or Block connections without VPN. Users choose these Android controls themselves.
 4. Do not silently change WSA Local network access, Windows firewall, Windows routes, DNS or host VPN configuration.
 5. A successful settings launch or provider-app launch does not prove a tunnel is connected. The initial UI deliberately does not display a connected state.
 6. Explain that Windows desktop traffic is outside the Android VPN tunnel.
 7. Treat a service declaration as a discovery signal, not a guarantee that every provider feature works under WSA.
 8. Validate package names before embedding them in shell commands.
+
+## All-Android-app VPN configuration
+
+For one provider to cover the Android apps in WSA, users connect the provider app, then select it in Android VPN settings and enable **Always-on VPN**. Enabling **Block connections without VPN** applies Android lockdown: apps cannot fall back to the ordinary Android network when the tunnel is down. Provider-level split-tunnel or per-app exclusions must also be reviewed because PacMan cannot override a provider's own routing choices. These controls apply to the WSA Android user only; Windows desktop traffic is outside this VPN.
 
 ## Remaining work and validation
 
@@ -52,6 +56,7 @@ This feature controls Android VPN apps and Android app traffic inside WSA only. 
 - Add provider display names and icons only through a reliable Android metadata source.
 - Test at least two independent VPN implementations on a real WSA installation, including first-use consent, connect, disconnect, WSA restart and provider switching.
 - Test WSA networking-mode interactions and record provider-specific compatibility limitations.
+- Verify from WSA that the explicit VPN Settings activity opens inside Android and never launches Windows Settings; verify the Android Settings fallback on images without that activity.
 - Add a Connected/Disconnected/Unknown indicator only after the underlying Android system signal is validated on supported WSA builds. Never infer active tunnel state from a running app or a successful launch command.
 
 ## Acceptance criteria
