@@ -28,7 +28,7 @@ void main() {
       expect(filtered, contains('com.android.vpndialogs'));
       expect(filtered, contains('MystNodes'));
       expect(filtered, contains('network.mysterium.provider'));
-      expect(filtered, isNot(contains('unrelated again')));
+      expect(filtered, isNot(contains('trailing noise 14')));
     });
 
     test('explains when no matching Android log lines are present', () {
@@ -113,7 +113,7 @@ void main() {
           MystNodesDiagnosticCommandResult(
             label: 'Large output',
             exitCode: 0,
-            stdout: 'A' * 30000,
+            stdout: List.filled(30000, 'A').join(),
           ),
         ],
       );
