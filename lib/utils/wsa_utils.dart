@@ -212,6 +212,22 @@ class WSAUtils {
       maxOutputCharacters: 3500,
     );
     await capture(
+      'Android VPN consent package UID (read-only)',
+      'cmd package list packages -U com.android.vpndialogs',
+      maxOutputCharacters: 800,
+    );
+    await capture(
+      'Installed MystNodes package UID (read-only)',
+      'cmd package list packages -U $mystNodesPackageName',
+      maxOutputCharacters: 800,
+    );
+    await capture(
+      'Android VPN consent package identity and CONTROL_VPN permission (read-only)',
+      "dumpsys package com.android.vpndialogs | grep -i -C 3 -E 'userId=|sharedUser|CONTROL_VPN|grantedPermissions|privateFlags|SYSTEM|PRIVILEGED'",
+      maxOutputCharacters: 2400,
+    );
+
+    await capture(
       'Android VPN consent activity resolution',
       'cmd package resolve-activity --brief -n com.android.vpndialogs/.ConfirmDialog',
       maxOutputCharacters: 1500,
