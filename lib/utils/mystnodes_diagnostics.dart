@@ -26,7 +26,7 @@ String sanitizeMystNodesDiagnosticText(String value) {
     caseSensitive: false,
   );
   final sensitiveAssignment = RegExp(
-    r'((?:password|passphrase|mnemonic|seed phrase|private[_ -]?key|authorization|bearer|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)\s*[:=]\s*)["'']?[^\s"'',;]+',
+    r"""((?:password|passphrase|mnemonic|seed phrase|private[_ -]?key|authorization|bearer|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)\s*[:=]\s*)["']?[^\s"',;]+""",
     caseSensitive: false,
   );
   final urlQuery = RegExp(r'(https?://[^\s?]+)\?[^\s]+');
