@@ -70,7 +70,7 @@ String limitMystNodesDiagnosticSection(
 }) {
   final safe = sanitizeMystNodesDiagnosticText(value);
   if (safe.length <= maxCharacters) return safe;
-  final marker = '\\n[Section truncated at $maxCharacters characters.]';
+  final marker = '\n[Section truncated at $maxCharacters characters.]';
   final available = maxCharacters > marker.length
       ? maxCharacters - marker.length
       : 0;
