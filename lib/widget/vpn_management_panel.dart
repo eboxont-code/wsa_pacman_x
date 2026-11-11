@@ -87,14 +87,14 @@ class _VpnManagementPanelState extends State<VpnManagementPanel> {
             height: 430,
             child: Scrollbar(
               child: SingleChildScrollView(
-                child: SelectableText(report),
+                child: Text(report),
               ),
             ),
           ),
           actions: [
             Button(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: report));
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: report));
               },
               child: Text(lang.wsa_mystnodes_copy_report),
             ),
