@@ -239,6 +239,7 @@ String selectMystNodesApkManifestServiceEntries(
   }
 
   final selected = <int>{};
+  final serviceBlocks = <String>[];
   final serviceSibling = RegExp(
     r'^\s*E:\s+(?:activity|activity-alias|meta-data|provider|receiver|service)(?:\s|$)',
     caseSensitive: false,
@@ -246,6 +247,7 @@ String selectMystNodesApkManifestServiceEntries(
   for (final start in serviceStarts) {
     final header = serviceHeader.firstMatch(lines[start])!;
     final indent = header.group(1)!.length;
+    final serviceLines = <String>[lines[start]];
     selected.add(start);
     for (var i = start + 1; i < lines.length; i++) {
       final sibling = serviceSibling.firstMatch(lines[i]);
@@ -253,13 +255,25 @@ String selectMystNodesApkManifestServiceEntries(
         break;
       }
       selected.add(i);
+      serviceLines.add(lines[i]);
     }
+    serviceBlocks.add(serviceLines.join('\n'));
   }
 
+  // Android requires the VPN action and BIND_VPN_SERVICE permission on the
+  // same service. Do not combine declarations from unrelated services.
+  final hasVpnAction = serviceBlocks.any(
+    (service) => service.contains('android.net.VpnService'),
+  );
+  final hasBindingPermission = serviceBlocks.any(
+    (service) => service.contains('android.permission.BIND_VPN_SERVICE'),
+  );
+  final hasCompleteVpnService = serviceBlocks.any(
+    (service) =>
+        service.contains('android.net.VpnService') &&
+        service.contains('android.permission.BIND_VPN_SERVICE'),
+  );
   final allServiceText = selected.toList()..sort();
-  final serviceText = allServiceText.map((index) => lines[index]).join('\n');
-  final hasVpnAction = serviceText.contains('android.net.VpnService');
-  final hasBindingPermission = serviceText.contains('android.permission.BIND_VPN_SERVICE');
   final bounded = allServiceText.length > maxLines
       ? allServiceText.sublist(0, maxLines)
       : allServiceText;
@@ -267,10 +281,104 @@ String selectMystNodesApkManifestServiceEntries(
     bounded.map((index) => lines[index]).join('\n'),
   );
   return 'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml.\n'
-      'Declared Android service elements: ${serviceStarts.length}.\n'
-      'A declared service contains the android.net.VpnService action: ${hasVpnAction ? 'yes' : 'no'}.\n'
-      'A declared service uses android.permission.BIND_VPN_SERVICE: ${hasBindingPermission ? 'yes' : 'no'}.\n'
+      'Declared Android service elements: ' + serviceStarts.length.toString() + '.\n'
+      'At least one declared service contains the android.net.VpnService action: ' +
+      (hasVpnAction ? 'yes' : 'no') + '.\n'
+      'At least one declared service uses android.permission.BIND_VPN_SERVICE: ' +
+      (hasBindingPermission ? 'yes' : 'no') + '.\n'
+      'A single declared service contains both required VPN declarations: ' +
+      (hasCompleteVpnService ? 'yes' : 'no') + '.\n'
       'Service declarations:\n$detail';
+}
+
+/// Summarises the read-only report without guessing at an unresolved root cause.
+String buildMystNodesDiagnosticAssessment(
+  List<MystNodesDiagnosticCommandResult> commands,
+) {
+  MystNodesDiagnosticCommandResult? findResult(String label) {
+    for (final command in commands) {
+      if (command.label == label) return command;
+    }
+    return null;
+  }
+
+  final findings = <String>[];
+  final manifest = findResult(
+    'Installed MystNodes base APK merged AndroidManifest.xml service declarations (AAPT2)',
+  );
+  final manifestParsed = manifest != null &&
+      manifest.exitCode == 0 &&
+      manifest.stdout.contains(
+        'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml',
+      );
+
+  if (!manifestParsed) {
+    findings.add(
+      'The installed APK VPN-service check is inconclusive. Do not infer that a service is missing until AAPT2 successfully inspects the merged manifest.',
+    );
+  } else {
+    final completeService = manifest!.stdout.contains(
+      'A single declared service contains both required VPN declarations: yes.',
+    );
+    if (completeService) {
+      findings.add(
+        'The installed MystNodes APK declares a service with both the Android VPN action and BIND_VPN_SERVICE permission. If Package Manager still finds no VPN service, the manifest and system discovery results need to be reconciled.',
+      );
+    } else {
+      findings.add(
+        'The installed MystNodes APK does not declare a single service containing both the android.net.VpnService action and android.permission.BIND_VPN_SERVICE permission. PacMan is therefore correctly excluding it from standard Android VPN-provider discovery. A vendor-confirmed compatible signed APK or vendor-supported alternative is needed; PacMan must not patch or re-sign this APK.',
+      );
+    }
+  }
+
+  final restriction = findResult(
+    'Android user VPN restriction source and context (read-only)',
+  );
+  if (restriction != null &&
+      restriction.stdout.toLowerCase().contains('no_config_vpn')) {
+    final owners = findResult(
+      'Android device and profile policy owners (read-only)',
+    );
+    final hasNoOwners = owners != null &&
+        owners.stdout.toLowerCase().contains('no owners');
+    final noLocalPolicy = RegExp(
+      r'Device policy local restrictions:\s*(?:none|null)',
+      caseSensitive: false,
+    ).hasMatch(restriction.stdout);
+    final noGlobalPolicy = RegExp(
+      r'Device policy global restrictions:\s*(?:none|null)',
+      caseSensitive: false,
+    ).hasMatch(restriction.stdout);
+    if (hasNoOwners && noLocalPolicy && noGlobalPolicy) {
+      findings.add(
+        'Android also reports no_config_vpn, but this capture found no device/profile owner and no device-policy local or global restriction. The restriction source remains unidentified; do not remove or bypass it based on this evidence.',
+      );
+    } else {
+      findings.add(
+        'Android reports no_config_vpn. The available owner/policy evidence does not fully identify its source, so do not remove or bypass it without a separate, evidence-based review.',
+      );
+    }
+  }
+
+  final logs = findResult(
+    'Recent MystNodes VPN-consent, policy and app-lifecycle logs (filtered)',
+  );
+  if (logs != null) {
+    final logText = logs.stdout.toLowerCase();
+    if (logText.contains('securityexception') &&
+        logText.contains('network.mysterium.provider') &&
+        (logText.contains('vpn.isvpnservicepreconsented') ||
+            logText.contains('vpnmanagerservice.preparevpn'))) {
+      findings.add(
+        'The Android logs also contain an AppOps package/UID SecurityException during VPN pre-authorization. This is a separate Android/WSA consent-path failure; the report does not establish why that identity mismatch occurs.',
+      );
+    }
+  }
+
+  if (findings.isEmpty) {
+    return 'No conclusive MystNodes compatibility finding could be derived from this capture.';
+  }
+  return findings.map((finding) => '- ' + finding).join('\n');
 }
 
 String buildMystNodesDiagnosticReport({
@@ -283,6 +391,9 @@ String buildMystNodesDiagnosticReport({
     ..writeln('Target package: $mystNodesPackageName')
     ..writeln('Mode: read-only; existing Android logs were not cleared.')
     ..writeln('Privacy: local report only. The base APK is temporarily copied for manifest inspection, then deleted; it is not uploaded.')
+    ..writeln()
+    ..writeln('=== Automated assessment (read-only) ===')
+    ..writeln(buildMystNodesDiagnosticAssessment(commands))
     ..writeln();
 
   for (final command in commands) {
