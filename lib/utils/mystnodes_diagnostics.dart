@@ -396,10 +396,13 @@ String buildMystNodesDiagnosticAssessment(
         r'shareduser(?:id)?\s*[=:]\s*[^\s]+',
         caseSensitive: false,
       ).hasMatch(identityText);
-      final controlVpnMentioned = identityText.contains('control_vpn');
-      final controlDetail = !controlVpnMentioned
-          ? 'This capture did not expose a CONTROL_VPN permission entry.'
-          : 'The package dump includes a CONTROL_VPN permission entry; verify its grant state before attributing the issue.';
+      final controlVpnGrant = RegExp(
+        r'CONTROL_VPN\\s*:\\s*granted=(true|false)',
+        caseSensitive: false,
+      ).firstMatch(identityText);
+      final controlDetail = controlVpnGrant == null
+          ? 'This capture did not expose a CONTROL_VPN grant state.'
+          : 'CONTROL_VPN is reported ${controlVpnGrant.group(1)!.toLowerCase()} for the dialog package.';
       final sharedDetail = sharedUser
           ? 'A shared-user entry is present in the package dump.'
           : 'No shared-user entry was visible in the package dump.';
