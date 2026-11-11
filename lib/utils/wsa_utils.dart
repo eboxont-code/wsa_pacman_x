@@ -75,11 +75,15 @@ class WSAUtils {
     );
   }
 
-  /// Opens Android's system VPN settings inside WSA.
+  /// Opens the VPN management screen inside Android in WSA.
   ///
-  /// The VPN client remains responsible for its connection, credentials and
-  /// first-use consent. This does not create a VPN tunnel or change Windows
-  /// desktop networking.
+  /// Use an explicit Android Settings component instead of the implicit
+  /// android.settings.VPN_SETTINGS intent. WSA can bridge that implicit action
+  /// to Windows Settings, which is outside the requested Android-only scope.
+  /// The explicit component keeps the launch inside the WSA Android container.
+  ///
+  /// The provider app and Android remain responsible for VPN consent,
+  /// Always-on VPN, lockdown and tunnel lifecycle.
   static Future<ProcessResult> launchVpnSettings({
     required String ipAddress,
     required int port,
@@ -87,23 +91,25 @@ class WSAUtils {
     final vpnSettings = await ADBUtils.shellToAddress(
       ipAddress,
       port,
-      'am start -a android.settings.VPN_SETTINGS',
+      buildAndroidVpnSettingsCommand(),
     );
     final output =
         '${vpnSettings.stdout ?? ''}\n${vpnSettings.stderr ?? ''}'
             .toLowerCase();
-    final couldNotResolveVpnSettings = vpnSettings.exitCode != 0 ||
+    final couldNotOpenAndroidVpnSettings = vpnSettings.exitCode != 0 ||
         output.contains('unable to resolve') ||
         output.contains('error type 3') ||
-        output.contains('no activity found');
-    if (!couldNotResolveVpnSettings) return vpnSettings;
+        output.contains('no activity found') ||
+        output.contains('does not exist');
 
-    // Some WSA images do not expose the VPN-specific settings intent.
-    // Fall back to Android Settings so the user can navigate manually.
+    if (!couldNotOpenAndroidVpnSettings) return vpnSettings;
+
+    // Keep the fallback explicitly inside Android. Never fall back to a
+    // Windows URI, protocol handler or Windows VPN settings page.
     return ADBUtils.shellToAddress(
       ipAddress,
       port,
-      'am start com.android.settings/.Settings',
+      buildAndroidSettingsFallbackCommand(),
     );
   }
   static bool launchDeveloperSettings() => launch("/deeplink wsa-client://developer-settings");

@@ -58,11 +58,19 @@ After WSA is running, open WSA Settings and enable **Developer mode**. In the An
 
 ### VPN apps inside WSA
 
-Install any compatible Android VPN client APK with PacMan, then open PacMan's **WSA** page and select **Find VPN apps**. PacMan queries Android Package Manager for apps declaring the standard `android.net.VpnService` service, lists the matching package names, and can launch a selected provider app. Use the provider app's own sign-in and **Connect** controls. Android displays and controls the first-use VPN permission request. The **Manage VPN settings** button opens Android's system VPN settings.
+Install a compatible Android VPN client APK with PacMan, then open PacMan's **WSA** page and select **Find VPN apps**. PacMan queries Android Package Manager for apps declaring the standard `android.net.VpnService` service and can launch a selected provider app. Sign in and press **Connect** inside that Android app; Android displays the first-use VPN permission request.
 
-Android allows one prepared/active VPN service per Android user/profile; switching providers is controlled by Android and the VPN apps. Each provider owns its account, server choices, protocol, configuration, tunnel and connection status. PacMan does not provide a VPN service, collect VPN credentials or claim a tunnel is connected just because an app was launched.
+Use **Open Android VPN settings** to open the VPN page inside Android in WSA. PacMan launches the explicit Android Settings VPN activity rather than the implicit VPN settings intent, which WSA may redirect to Windows Settings. If the VPN page is unavailable in a particular WSA image, PacMan falls back to the main Android Settings screen; it never opens Windows VPN settings.
 
-This feature protects Android app traffic routed through WSA's Android VPN service only. It does **not** automatically protect Windows desktop traffic; configure a separate Windows VPN for that. A service declaration is a discovery signal, not a guarantee that every provider feature is compatible with WSA. Test the provider you intend to use. WSA's **Local network access** setting controls Android access to devices on the local network; it is not the Android VPN permission switch. PacMan does not change that setting or Windows networking automatically.
+**To route and protect all Android apps in WSA with one VPN:**
+1. Open the selected provider app and connect it.
+2. In Android VPN settings, select that provider and turn on **Always-on VPN**.
+3. Turn on **Block connections without VPN** (Android's VPN lockdown) if you want apps to lose network access whenever the VPN is disconnected.
+4. Check the provider's own split-tunneling or per-app exclusions. PacMan cannot override a provider's app exclusions; the lockdown setting prevents excluded apps from silently using the ordinary network.
+
+Android permits one active VPN service per Android user/profile. Each provider owns its account, server choices, protocol, configuration and tunnel. PacMan does not provide a VPN service, collect VPN credentials or claim a tunnel is connected just because an app was launched. Android's VPN service applies to the WSA Android user and its apps only — it does **not** route Windows desktop applications through the tunnel.
+
+WSA VPN compatibility varies by provider and networking mode. Microsoft's WSA release notes warn that some VPNs can lose Android connectivity with Advanced Networking enabled; test the VPN inside WSA, and only change WSA's separate **Local network access** option if troubleshooting demonstrates it's needed. PacMan does not change WSA or Windows networking automatically.
 ### Uninstalling PacMan
 
 Use **Start → WSA PacMan → Uninstall WSA PacMan**. The uninstaller removes the files installed by PacMan and this user's PacMan settings folders. It does **not** remove the separately installed WSA runtime under `%ProgramData%\WSABuilds`, or uninstall Android apps or delete Android user data.

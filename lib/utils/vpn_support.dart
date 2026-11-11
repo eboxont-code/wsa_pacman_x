@@ -1,4 +1,21 @@
-/// Provider-neutral models and parsing for Android VpnService discovery in WSA.
+/// Provider-neutral models and helpers for Android VPN management in WSA.
+///
+/// Android apps expose VPN capability by declaring a service that handles the
+/// `android.net.VpnService` intent action. The Android system, not PacMan,
+/// remains responsible for VPN consent and tunnel lifecycle.
+
+/// Explicit AOSP Settings activity. Avoid the implicit VPN_SETTINGS intent in
+/// WSA because its host integration can route that action to Windows Settings.
+const String androidVpnSettingsComponent =
+    r'com.android.settings/.Settings$VpnSettingsActivity';
+
+/// Launch Android's VPN settings activity inside the WSA Android container.
+String buildAndroidVpnSettingsCommand() =>
+    "am start -n '$androidVpnSettingsComponent'";
+
+/// Safe Android-only fallback when a WSA image lacks the VPN settings activity.
+String buildAndroidSettingsFallbackCommand() =>
+    "am start -n 'com.android.settings/.Settings'";
 ///
 /// Android apps expose VPN capability by declaring a service that handles the
 /// `android.net.VpnService` intent action. The Android system, not PacMan,
