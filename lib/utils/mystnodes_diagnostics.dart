@@ -188,14 +188,14 @@ String selectMystNodesPackageServiceMetadata(
 /// Finds the base APK path returned by `pm path` without trusting arbitrary
 /// command output as a local or remote path.
 String? extractMystNodesBaseApkPath(String packagePathOutput) {
-  for (final rawLine in packagePathOutput.split(RegExp(r'\\r?\\n'))) {
+  for (final rawLine in packagePathOutput.split(RegExp(r'\r?\n'))) {
     final line = rawLine.trim();
     if (!line.startsWith('package:')) continue;
     final path = line.substring('package:'.length).trim();
     if (path.startsWith('/data/app/') &&
         path.endsWith('/base.apk') &&
         !path.contains('..') &&
-        !RegExp(r'[\\s\\x00]').hasMatch(path)) {
+        !RegExp(r'[\s\x00]').hasMatch(path)) {
       return path;
     }
   }
@@ -210,13 +210,13 @@ String selectMystNodesApkManifestServiceEntries(
   String xmlTreeOutput, {
   int maxLines = 140,
 }) {
-  final lines = xmlTreeOutput.split(RegExp(r'\\r?\\n'));
+  final lines = xmlTreeOutput.split(RegExp(r'\r?\n'));
   final hasManifest = lines.any(
-    (line) => RegExp(r'^\\s*E:\\s+manifest(?:\\s|$)', caseSensitive: false)
+    (line) => RegExp(r'^\s*E:\s+manifest(?:\s|$)', caseSensitive: false)
         .hasMatch(line),
   );
   final hasApplication = lines.any(
-    (line) => RegExp(r'^\\s*E:\\s+application(?:\\s|$)', caseSensitive: false)
+    (line) => RegExp(r'^\s*E:\s+application(?:\s|$)', caseSensitive: false)
         .hasMatch(line),
   );
   if (!hasManifest || !hasApplication) {
@@ -224,7 +224,7 @@ String selectMystNodesApkManifestServiceEntries(
   }
 
   final serviceHeader = RegExp(
-    r'^(\\s*)E:\\s+service(?:\\s|$)',
+    r'^(\s*)E:\s+service(?:\s|$)',
     caseSensitive: false,
   );
   final serviceStarts = <int>[];
@@ -232,14 +232,14 @@ String selectMystNodesApkManifestServiceEntries(
     if (serviceHeader.hasMatch(lines[i])) serviceStarts.add(i);
   }
   if (serviceStarts.isEmpty) {
-    return 'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml.\\n'
-        'Declared Android service elements: 0.\\n'
+    return 'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml.\n'
+        'Declared Android service elements: 0.\n'
         'No <service> element is declared in this base APK manifest.';
   }
 
   final selected = <int>{};
   final serviceSibling = RegExp(
-    r'^\\s*E:\\s+(?:activity|activity-alias|meta-data|provider|receiver|service)(?:\\s|$)',
+    r'^\s*E:\s+(?:activity|activity-alias|meta-data|provider|receiver|service)(?:\s|$)',
     caseSensitive: false,
   );
   for (final start in serviceStarts) {
@@ -256,20 +256,20 @@ String selectMystNodesApkManifestServiceEntries(
   }
 
   final allServiceText = selected.toList()..sort();
-  final serviceText = allServiceText.map((index) => lines[index]).join('\\n');
+  final serviceText = allServiceText.map((index) => lines[index]).join('\n');
   final hasVpnAction = serviceText.contains('android.net.VpnService');
   final hasBindingPermission = serviceText.contains('android.permission.BIND_VPN_SERVICE');
   final bounded = allServiceText.length > maxLines
       ? allServiceText.sublist(0, maxLines)
       : allServiceText;
   final detail = sanitizeMystNodesDiagnosticText(
-    bounded.map((index) => lines[index]).join('\\n'),
+    bounded.map((index) => lines[index]).join('\n'),
   );
-  return 'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml.\\n'
-      'Declared Android service elements: ${serviceStarts.length}.\\n'
-      'A declared service contains the android.net.VpnService action: ${hasVpnAction ? 'yes' : 'no'}.\\n'
-      'A declared service uses android.permission.BIND_VPN_SERVICE: ${hasBindingPermission ? 'yes' : 'no'}.\\n'
-      'Service declarations:\\n$detail';
+  return 'AAPT2 successfully parsed the installed MystNodes base APK AndroidManifest.xml.\n'
+      'Declared Android service elements: ${serviceStarts.length}.\n'
+      'A declared service contains the android.net.VpnService action: ${hasVpnAction ? 'yes' : 'no'}.\n'
+      'A declared service uses android.permission.BIND_VPN_SERVICE: ${hasBindingPermission ? 'yes' : 'no'}.\n'
+      'Service declarations:\n$detail';
 }
 
 String buildMystNodesDiagnosticReport({
@@ -281,7 +281,7 @@ String buildMystNodesDiagnosticReport({
     ..writeln('Captured: ${capturedAt.toUtc().toIso8601String()}')
     ..writeln('Target package: $mystNodesPackageName')
     ..writeln('Mode: read-only; existing Android logs were not cleared.')
-    ..writeln('Privacy: this report is local. Review it before sharing.')
+    ..writeln('Privacy: local report only. The base APK is temporarily copied for manifest inspection, then deleted; it is not uploaded.')
     ..writeln();
 
   for (final command in commands) {
