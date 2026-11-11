@@ -22,7 +22,7 @@ class MystNodesDiagnosticCommandResult {
 String sanitizeMystNodesDiagnosticText(String value) {
   final result = <String>[];
   final sensitiveLine = RegExp(
-    r'(password|passphrase|mnemonic|seed phrase|private[_ -]?key|authorization|bearer|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)',
+    r'(password|passphrase|mnemonic|seed phrase|private[_ -]?key|authorization|bearer|access[_ -]?token|refresh[_ -]?token|api[_ -]?key|token)',
     caseSensitive: false,
   );
   final sensitiveAssignment = RegExp(
