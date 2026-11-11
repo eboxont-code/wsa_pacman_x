@@ -122,13 +122,8 @@ class WSAUtils {
       maxOutputCharacters: 6500,
     );
     await capture(
-      'Device-wide Android VPN service query',
+      'Device-wide Android VPN service query (supported Package Manager syntax)',
       'cmd package query-services --brief --components -a android.net.VpnService',
-    );
-    await capture(
-      'MystNodes-only Android VPN service query',
-      'cmd package query-services --brief --components -p $mystNodesPackageName -a android.net.VpnService',
-      maxOutputCharacters: 2000,
     );
     await capture(
       'Recent MystNodes process exit history',
