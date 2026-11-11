@@ -86,7 +86,7 @@ String selectMystNodesRelevantLogLines(
 }) {
   final lines = logOutput.split(RegExp(r'\r?\n'));
   final anchor = RegExp(
-    r'(network\.mysterium\.provider|MystNodes|VpnService|VpnManager|VpnDialogs|BIND_VPN_SERVICE|android\.net\.VpnService|AndroidRuntime|FATAL EXCEPTION|Fatal signal|ActivityTaskManager|ActivityManager|PackageManager|Permission Denial|SecurityException|ForegroundService|RemoteServiceException|NodeService|NodeImpl|LaunchViewModel|missing_vpn_permission|Process .* has died|Killing .*network\.mysterium)',
+    r'(network\.mysterium\.provider|MystNodes|VpnService|VpnManager|VpnDialogs|VpnConfirm|com\.android\.vpndialogs|ConfirmDialog|BIND_VPN_SERVICE|android\.net\.VpnService|AndroidRuntime|FATAL EXCEPTION|Fatal signal|ActivityTaskManager|ActivityManager|PackageManager|Permission Denial|SecurityException|ForegroundService|RemoteServiceException|NodeService|NodeImpl|LaunchViewModel|missing_vpn_permission|Process .* has died|Killing .*network\.mysterium)',
     caseSensitive: false,
   );
   final selected = <int>{};
