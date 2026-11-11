@@ -181,11 +181,11 @@ class WSAUtils {
             ),
           ));
         }
-      } catch (error) {
-        results.add(MystNodesDiagnosticCommandResult(
+      } catch (_) {
+        results.add(const MystNodesDiagnosticCommandResult(
           label: 'Installed MystNodes APK merged manifest inspection (local temporary copy)',
           exitCode: -1,
-          stderr: 'The local APK manifest inspection could not complete: $error',
+          stderr: 'The local APK manifest inspection could not complete. No MystNodes data or settings were changed.',
         ));
       } finally {
         if (temporaryDirectory != null && await temporaryDirectory.exists()) {
@@ -195,7 +195,7 @@ class WSAUtils {
             results.add(MystNodesDiagnosticCommandResult(
               label: 'Temporary MystNodes APK cleanup',
               exitCode: -1,
-              stderr: 'Temporary APK cleanup needs attention: $error',
+              stderr: 'PacMan could not remove its temporary APK inspection folder automatically. No app data was changed.',
             ));
           }
         }
@@ -433,11 +433,23 @@ extension ADBUtils on Future<ProcessResult> {
     int port,
     String remotePath,
     String localPath,
-  ) => _withDevice(
-    _toName(ipAddress, port),
-    'pull',
-    args: [remotePath, localPath],
-  );
+  ) {
+    if (!remotePath.startsWith('/data/app/') ||
+        !remotePath.endsWith('/base.apk') ||
+        remotePath.contains('..') ||
+        RegExp(r'[\\s\\x00]').hasMatch(remotePath)) {
+      return Future.error(ArgumentError.value(
+        remotePath,
+        'remotePath',
+        'Only an installed Android base APK path can be pulled for local manifest inspection',
+      ));
+    }
+    return _withDevice(
+      _toName(ipAddress, port),
+      'pull',
+      args: [remotePath, localPath],
+    );
+  }
   static Future<ProcessResult> shellToWSA(String command) => shell(deviceName, command);
 
   static Future<ProcessResult> push(String device, String inPath, String outPath, {String? workDir}) => _withDevice(device, 'push', args: [inPath, outPath], workDir: workDir);
