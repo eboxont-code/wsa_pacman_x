@@ -72,6 +72,7 @@
     "wsa_mystnodes_diagnostic_title": "MystNodes diagnostic report",
     "wsa_mystnodes_copy_report": "Copy report",
     "wsa_mystnodes_close_report": "Close",
+    "wsa_mystnodes_capture_failed": "Could not collect MystNodes diagnostics. Check the WSA connection and try again.",
 
     
     "settings_port": "WSA Port",
