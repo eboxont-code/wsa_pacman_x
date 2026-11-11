@@ -99,6 +99,67 @@ void main() {
     });
   });
 
+  group('Installed MystNodes APK manifest inspection', () {
+    test('extracts only a base APK path from Package Manager output', () {
+      expect(
+        extractMystNodesBaseApkPath(
+          'package:/data/app/~~safe/network.mysterium.provider-abc/base.apk\\n',
+        ),
+        '/data/app/~~safe/network.mysterium.provider-abc/base.apk',
+      );
+      expect(
+        extractMystNodesBaseApkPath(
+          'package:/data/app/~~safe/network.mysterium.provider-abc/split_config.x86_64.apk\\n',
+        ),
+        isNull,
+      );
+      expect(
+        extractMystNodesBaseApkPath(
+          'package:/data/app/../../private/base.apk\\n',
+        ),
+        isNull,
+      );
+    });
+
+    test('reports the exact VPN service declaration from a parsed manifest', () {
+      final report = selectMystNodesApkManifestServiceEntries(
+        'N: android=http://schemas.android.com/apk/res/android\\n'
+        '  E: manifest (line=1)\\n'
+        '    E: application (line=8)\\n'
+        '      E: service (line=12)\\n'
+        '        A: android:name(0x01010003)=\"network.mysterium.node.core.NodeService\"\\n'
+        '        A: android:exported(0x01010010)=(type 0x12)0x0\\n'
+        '      E: service (line=18)\\n'
+        '        A: android:name(0x01010003)=\"network.mysterium.node.vpn.NodeVpnService\"\\n'
+        '        A: android:permission(0x01010006)=\"android.permission.BIND_VPN_SERVICE\"\\n'
+        '        E: intent-filter (line=20)\\n'
+        '          E: action (line=21)\\n'
+        '            A: android:name(0x01010003)=\"android.net.VpnService\"\\n'
+        '      E: activity (line=30)\\n',
+      );
+
+      expect(report, contains('Declared Android service elements: 2'));
+      expect(report, contains('android.net.VpnService action: yes'));
+      expect(report, contains('BIND_VPN_SERVICE: yes'));
+      expect(report, contains('network.mysterium.node.vpn.NodeVpnService'));
+    });
+
+    test('only reports no services after confirming a parsed manifest tree', () {
+      final noServices = selectMystNodesApkManifestServiceEntries(
+        'E: manifest (line=1)\\n'
+        '  E: application (line=5)\\n'
+        '    E: activity (line=6)\\n',
+      );
+      final unknown = selectMystNodesApkManifestServiceEntries(
+        'Error: could not open AndroidManifest.xml\\n',
+      );
+
+      expect(noServices, contains('Declared Android service elements: 0'));
+      expect(noServices, contains('No <service> element is declared'));
+      expect(unknown, contains('service declarations are inconclusive'));
+    });
+  });
+
   group('sanitizeMystNodesDiagnosticText', () {
     test('redacts credential assignments, URL query values and email addresses', () {
       final safe = sanitizeMystNodesDiagnosticText(
