@@ -128,6 +128,24 @@ The next step is vendor confirmation of whether the official MystNodes 5.2.2 APK
 
 PacMan's next diagnostic update adds a short automated assessment at the top of the report. It requires the VPN action and binding permission to be declared on the same Android service and keeps restriction-source uncertainty explicit.
 
+## 1F. Official vendor distribution and dependency review (2026-11-12)
+
+The public distribution channels were checked before considering an APK update or a custom build.
+
+**Official MystNodes app**
+- The official [Google Play listing](https://play.google.com/store/apps/details?id=network.mysterium.provider) still shows MystNodes version 5.2.2 and an update date of 5 May 2026.
+- The public [mysteriumnetwork/mysterium-mobile-provider repository](https://github.com/mysteriumnetwork/mysterium-mobile-provider) still has app version name 5.2.2 / version code 11 on its current `master` source. Its current version catalog pins `provider-mobile-node 1.38.1`.
+- The latest public source commits for that app repository are dated 5 May 2026. No newer public, vendor-signed MystNodes APK release was found in the official distribution channels reviewed.
+- The official [Android setup guide](https://help.mystnodes.com/en/articles/8165874-getting-started-mystnodes-app-on-android) documents installation and onboarding on Android, but does not document WSA compatibility. This is not proof that WSA is unsupported; it remains a vendor question.
+
+**Node-library version is not an app fix**
+- The vendor app repository has an open [PR #52](https://github.com/mysteriumnetwork/mysterium-mobile-provider/pull/52) whose only changed source file is `android/gradle/libs.versions.toml`, changing the node dependency from `1.38.1` to `1.39.7`. It is not merged and does not itself publish a MystNodes APK or document a VPN-service manifest correction.
+- The Mysterium Node project has since published [node release 1.39.9](https://github.com/mysteriumnetwork/node/releases/tag/1.39.9) on 28 October 2026. Its published release note concerns session validation in `keepAliveLoop`; it does not announce a MystNodes Android VPN-service or WSA-consent fix.
+- The installed MystNodes 5.2.2 merged manifest remains the decisive evidence for the APK in use: four services, none declaring `android.net.VpnService` or `android.permission.BIND_VPN_SERVICE`. A dependency version bump cannot be assumed to add the missing service without inspecting the resulting signed APK.
+
+**Decision**
+No vendor-signed MystNodes update has been identified that is proven to fix this issue. Do not sideload an unrelated custom build, build/re-sign the vendor app with a different signing key, or replace the current app as an experiment: a different signing identity cannot be treated as a safe in-place update, and uninstalling could jeopardize existing MystNodes data. Request vendor confirmation of the expected merged manifest and WSA support. Separately investigate the WSA `no_config_vpn` restriction and AppOps UID/package mismatch. No security exception or WSA/Windows configuration change is authorised by this review.
+
 ## 2. Goal and boundaries
 
 ### Goal
