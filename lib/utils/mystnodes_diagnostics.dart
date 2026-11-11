@@ -248,7 +248,7 @@ String selectMystNodesApkManifestServiceEntries(
     selected.add(start);
     for (var i = start + 1; i < lines.length; i++) {
       final sibling = serviceSibling.firstMatch(lines[i]);
-      if (sibling != null && sibling.group(0)!.takeWhile((c) => c == ' ').length <= indent) {
+      if (sibling != null && sibling.group(0)!.indexOf('E:') <= indent) {
         break;
       }
       selected.add(i);
