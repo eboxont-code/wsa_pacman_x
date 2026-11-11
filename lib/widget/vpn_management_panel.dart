@@ -55,7 +55,7 @@ class _VpnManagementPanelState extends State<VpnManagementPanel> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = AppLocalizations.of(context)!.wsa_vpn_discovery_failed;
+        _error = AppLocalizations.of(context)!.wsa_vpn_settings_failed;
         _hasSearched = true;
         _isSearching = false;
       });
@@ -72,13 +72,13 @@ class _VpnManagementPanelState extends State<VpnManagementPanel> {
       if (!mounted) return;
       if (result.exitCode != 0) {
         setState(() {
-          _error = AppLocalizations.of(context)!.wsa_vpn_discovery_failed;
+          _error = AppLocalizations.of(context)!.wsa_vpn_settings_failed;
         });
       }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = AppLocalizations.of(context)!.wsa_vpn_discovery_failed;
+        _error = AppLocalizations.of(context)!.wsa_vpn_settings_failed;
       });
     }
   }
