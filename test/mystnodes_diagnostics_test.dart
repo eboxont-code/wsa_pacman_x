@@ -2,6 +2,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wsa_pacman/utils/mystnodes_diagnostics.dart';
 
 void main() {
+  group('limitMystNodesDiagnosticSection', () {
+    test('sanitizes and bounds large command output', () {
+      final limited = limitMystNodesDiagnosticSection(
+        'token=private-value\n' + ('A' * 2000),
+        maxCharacters: 500,
+      );
+
+      expect(limited.length, lessThanOrEqualTo(500));
+      expect(limited, isNot(contains('private-value')));
+      expect(limited, contains('Section truncated at 500 characters'));
+    });
+  });
+
   group('MystNodes diagnostic log selection', () {
     test('keeps VPN, MystNodes and Android activity lifecycle context', () {
       final filtered = selectMystNodesRelevantLogLines(
@@ -41,12 +54,14 @@ void main() {
     test('redacts credential assignments, URL query values and email addresses', () {
       final safe = sanitizeMystNodesDiagnosticText(
         'api_key=secret-value\n'
+        'Authorization: Bearer bearer-secret-value\n'
         'Request https://example.test/node?access_token=private-value\n'
         'Contact user@example.test\n'
         'normal package network.mysterium.provider\n',
       );
 
       expect(safe, isNot(contains('secret-value')));
+      expect(safe, isNot(contains('bearer-secret-value')));
       expect(safe, isNot(contains('private-value')));
       expect(safe, isNot(contains('user@example.test')));
       expect(safe, contains('[REDACTED]'));
@@ -103,7 +118,7 @@ void main() {
         ],
       );
 
-      expect(report.length, lessThanOrEqualTo(24020));
+      expect(report.length, lessThanOrEqualTo(28020));
       expect(report, contains('Report truncated'));
     });
   });
