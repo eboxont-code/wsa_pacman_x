@@ -295,8 +295,8 @@ String selectMystNodesApkManifestServiceEntries(
 /// Package Manager dump output. Returns null when the output is inconclusive.
 int? extractAndroidPackageUid(String output) {
   final patterns = [
-    RegExp(r'\\buid\\s*:\\s*(\\d+)', caseSensitive: false),
-    RegExp(r'\\buserId\\s*=\\s*(\\d+)', caseSensitive: false),
+    RegExp(r'\buid\s*:\s*(\d+)', caseSensitive: false),
+    RegExp(r'\buserId\s*=\s*(\d+)', caseSensitive: false),
   ];
   for (final pattern in patterns) {
     final match = pattern.firstMatch(output);
@@ -393,7 +393,7 @@ String buildMystNodesDiagnosticAssessment(
       );
       final identityText = dialogIdentity?.stdout.toLowerCase() ?? '';
       final sharedUser = RegExp(
-        r'shareduser(?:id)?\\s*[=:]\\s*[^\\s]+',
+        r'shareduser(?:id)?\s*[=:]\s*[^\s]+',
         caseSensitive: false,
       ).hasMatch(identityText);
       final controlVpnMentioned = identityText.contains('control_vpn');
