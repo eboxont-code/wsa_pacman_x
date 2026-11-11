@@ -1,4 +1,5 @@
 import 'package:fluent_ui/fluent_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:mdi/mdi.dart';
 import 'package:wsa_pacman/global_state.dart';
 import 'package:wsa_pacman/utils/vpn_support.dart';
@@ -28,6 +29,7 @@ class VpnManagementPanel extends StatefulWidget {
 
 class _VpnManagementPanelState extends State<VpnManagementPanel> {
   bool _isSearching = false;
+  bool _isCapturing = false;
   bool _hasSearched = false;
   List<VpnProvider> _providers = const [];
   String? _error;
@@ -55,10 +57,65 @@ class _VpnManagementPanelState extends State<VpnManagementPanel> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = AppLocalizations.of(context)!.wsa_vpn_settings_failed;
+        _error = AppLocalizations.of(context)!.wsa_vpn_discovery_failed;
         _hasSearched = true;
         _isSearching = false;
       });
+    }
+  }
+
+  Future<void> _captureMystNodesReport() async {
+    if (!widget.isConnected || _isCapturing) return;
+    setState(() {
+      _isCapturing = true;
+      _error = null;
+    });
+
+    try {
+      final report = await WSAUtils.captureMystNodesDiagnostic(
+        ipAddress: widget.ipAddress,
+        port: widget.port,
+      );
+      if (!mounted) return;
+      final lang = AppLocalizations.of(context)!;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => ContentDialog(
+          title: Text(lang.wsa_mystnodes_diagnostic_title),
+          content: SizedBox(
+            width: 660,
+            height: 430,
+            child: Scrollbar(
+              child: SingleChildScrollView(
+                child: SelectableText(report),
+              ),
+            ),
+          ),
+          actions: [
+            Button(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: report));
+              },
+              child: Text(lang.wsa_mystnodes_copy_report),
+            ),
+            Button(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(lang.wsa_mystnodes_close_report),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = AppLocalizations.of(context)!.wsa_vpn_discovery_failed;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCapturing = false;
+        });
+      }
     }
   }
 
@@ -153,6 +210,19 @@ class _VpnManagementPanelState extends State<VpnManagementPanel> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        Button(
+          onPressed: widget.isConnected && !_isCapturing
+              ? _captureMystNodesReport
+              : null,
+          child: Text(
+            _isCapturing
+                ? lang.wsa_mystnodes_capturing
+                : lang.wsa_mystnodes_capture_report,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(lang.wsa_mystnodes_capture_hint),
         if (!widget.isConnected) ...[
           const SizedBox(height: 10),
           Text(lang.wsa_vpn_connect_first),
