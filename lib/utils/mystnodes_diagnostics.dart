@@ -122,7 +122,7 @@ String selectMystNodesRestrictionContext(
   String dumpOutput, {
   int maxLines = 100,
 }) {
-  final lines = dumpOutput.split(RegExp(r'\\r?\\n'));
+  final lines = dumpOutput.split(RegExp(r'\r?\n'));
   final anchor = RegExp(
     r'(no_config_vpn|DISALLOW_CONFIG_VPN|base restrictions|user restrictions|device policy local restrictions|device policy global restrictions|restriction source|UserInfo)',
     caseSensitive: false,
@@ -146,7 +146,7 @@ String selectMystNodesRestrictionContext(
     return '[No VPN restriction source labels were visible in the Android user dump.]';
   }
   return sanitizeMystNodesDiagnosticText(
-    bounded.map((index) => lines[index]).join('\\n'),
+    bounded.map((index) => lines[index]).join('\n'),
   );
 }
 
@@ -157,9 +157,9 @@ String selectMystNodesPackageServiceMetadata(
   String packageDump, {
   int maxLines = 100,
 }) {
-  final lines = packageDump.split(RegExp(r'\\r?\\n'));
+  final lines = packageDump.split(RegExp(r'\r?\n'));
   final anchor = RegExp(
-    r'(Services:|Service Resolver Table|android\\.net\\.VpnService|BIND_VPN_SERVICE|VpnService|NodeService|ServiceRecord|ServiceInfo)',
+    r'(Services:|Service Resolver Table|android\.net\.VpnService|BIND_VPN_SERVICE|VpnService|NodeService|ServiceRecord|ServiceInfo)',
     caseSensitive: false,
   );
   final selected = <int>{};
@@ -181,7 +181,7 @@ String selectMystNodesPackageServiceMetadata(
     return '[No service/component declaration lines were visible in the MystNodes package dump; this alone does not prove the APK has no VPN service.]';
   }
   return sanitizeMystNodesDiagnosticText(
-    bounded.map((index) => lines[index]).join('\\n'),
+    bounded.map((index) => lines[index]).join('\n'),
   );
 }
 
