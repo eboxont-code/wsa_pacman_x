@@ -103,19 +103,19 @@ void main() {
     test('extracts only a base APK path from Package Manager output', () {
       expect(
         extractMystNodesBaseApkPath(
-          'package:/data/app/~~safe/network.mysterium.provider-abc/base.apk\\n',
+          'package:/data/app/~~safe/network.mysterium.provider-abc/base.apk\n',
         ),
         '/data/app/~~safe/network.mysterium.provider-abc/base.apk',
       );
       expect(
         extractMystNodesBaseApkPath(
-          'package:/data/app/~~safe/network.mysterium.provider-abc/split_config.x86_64.apk\\n',
+          'package:/data/app/~~safe/network.mysterium.provider-abc/split_config.x86_64.apk\n',
         ),
         isNull,
       );
       expect(
         extractMystNodesBaseApkPath(
-          'package:/data/app/../../private/base.apk\\n',
+          'package:/data/app/../../private/base.apk\n',
         ),
         isNull,
       );
@@ -123,19 +123,19 @@ void main() {
 
     test('reports the exact VPN service declaration from a parsed manifest', () {
       final report = selectMystNodesApkManifestServiceEntries(
-        'N: android=http://schemas.android.com/apk/res/android\\n'
-        '  E: manifest (line=1)\\n'
-        '    E: application (line=8)\\n'
-        '      E: service (line=12)\\n'
-        '        A: android:name(0x01010003)=\"network.mysterium.node.core.NodeService\"\\n'
-        '        A: android:exported(0x01010010)=(type 0x12)0x0\\n'
-        '      E: service (line=18)\\n'
-        '        A: android:name(0x01010003)=\"network.mysterium.node.vpn.NodeVpnService\"\\n'
-        '        A: android:permission(0x01010006)=\"android.permission.BIND_VPN_SERVICE\"\\n'
-        '        E: intent-filter (line=20)\\n'
-        '          E: action (line=21)\\n'
-        '            A: android:name(0x01010003)=\"android.net.VpnService\"\\n'
-        '      E: activity (line=30)\\n',
+        'N: android=http://schemas.android.com/apk/res/android\n'
+        '  E: manifest (line=1)\n'
+        '    E: application (line=8)\n'
+        '      E: service (line=12)\n'
+        '        A: android:name(0x01010003)=\"network.mysterium.node.core.NodeService\"\n'
+        '        A: android:exported(0x01010010)=(type 0x12)0x0\n'
+        '      E: service (line=18)\n'
+        '        A: android:name(0x01010003)=\"network.mysterium.node.vpn.NodeVpnService\"\n'
+        '        A: android:permission(0x01010006)=\"android.permission.BIND_VPN_SERVICE\"\n'
+        '        E: intent-filter (line=20)\n'
+        '          E: action (line=21)\n'
+        '            A: android:name(0x01010003)=\"android.net.VpnService\"\n'
+        '      E: activity (line=30)\n',
       );
 
       expect(report, contains('Declared Android service elements: 2'));
@@ -146,12 +146,12 @@ void main() {
 
     test('only reports no services after confirming a parsed manifest tree', () {
       final noServices = selectMystNodesApkManifestServiceEntries(
-        'E: manifest (line=1)\\n'
-        '  E: application (line=5)\\n'
-        '    E: activity (line=6)\\n',
+        'E: manifest (line=1)\n'
+        '  E: application (line=5)\n'
+        '    E: activity (line=6)\n',
       );
       final unknown = selectMystNodesApkManifestServiceEntries(
-        'Error: could not open AndroidManifest.xml\\n',
+        'Error: could not open AndroidManifest.xml\n',
       );
 
       expect(noServices, contains('Declared Android service elements: 0'));
