@@ -40,7 +40,6 @@ class WSAUtils {
       ipAddress,
       port,
       'cmd package query-services --brief --components -a android.net.VpnService',
-      maxOutputCharacters: 2000,
     );
     if (result.exitCode != 0) {
       final output = [
