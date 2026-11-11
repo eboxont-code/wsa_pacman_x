@@ -180,8 +180,8 @@ void main() {
         '      A: android:permission(0x01010006)="android.permission.BIND_VPN_SERVICE"\n',
       );
 
-      expect(report, contains('android.net.VpnService action: yes'));
-      expect(report, contains('BIND_VPN_SERVICE permission: yes'));
+      expect(report, contains('At least one declared service contains the android.net.VpnService action: yes.'));
+      expect(report, contains('At least one declared service uses android.permission.BIND_VPN_SERVICE: yes.'));
       expect(
         report,
         contains('A single declared service contains both required VPN declarations: no'),
