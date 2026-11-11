@@ -12,18 +12,21 @@ This file is the single project task register. Keep it concise, current and evid
 - [x] **Repository CI and documentation housekeeping.** Run the complete Flutter test suite, build on pushes and pull requests to `main`, align the displayed/package/installer versions, remove the unused Flutter counter-test scaffold, and add contribution/security/repository-structure guidance.
 - [x] **Post-install launch option and version audit.** Add a preselected `Launch WSA PacMan` checkbox to the installer Finish page, guard the launch against a missing installed executable, and align the native Windows file/product version with the package/app/installer version. CI validates the launch entry and native version metadata.
 
-## Priority 0 — MystNodes compatibility (chosen app; planning only)
+## Priority 0 — MystNodes compatibility (chosen app; execution active)
 
-- [ ] **Diagnose and make the selected MystNodes app work inside WSA.** Fixed target package: `network.mysterium.provider`. User reports MystNodes shows "VPN connection has to be granted for Myst Nodes to work"; tapping OK closes the entire app. PacMan currently reports no installed apps declaring an Android VPN service. Do not substitute another Mysterium app or assume the cause.
-  - [ ] Preserve baseline and gather a time-bounded, read-only Android log around one reproduction; do not clear logs or app data.
+- [ ] **Diagnose and make the selected MystNodes app work inside WSA.** Fixed target package: `network.mysterium.provider`. The user reports MystNodes shows "VPN connection has to be granted for Myst Nodes to work"; tapping OK closes the entire app. PacMan previously showed no VPN apps. Do not substitute another Mysterium app or assume the installed APK matches current upstream.
+  - [x] Review current upstream MystNodes startup source: it calls `VpnService.prepare()`; a non-OK activity result shows the exact warning; tapping OK then closes the task with `finishAndRemoveTask()`. The installed app version and actual WSA permission result still need checking.
+  - [x] Implement local-only, read-only diagnostic capture in branch `fix/mystnodes-diagnostic-capture`: Android version/ABI, installed APK paths and package/service metadata, supported device-wide VPN service query, Android VPN-consent dialog package/activity availability, current Always-on VPN package, VPN configuration restrictions, process-exit history and filtered recent logcat. The report does not clear logs or upload data.
+  - [ ] Validate the diagnostic feature with Flutter tests and the full Windows build; deliver a test installer.
+  - [ ] User installs the diagnostic build, reproduces once, copies the report from PacMan and shares it for analysis. This is the next required evidence; no machine-setting changes are planned before review.
   - [ ] Inspect the exact installed MystNodes APK version, signing identity, ABI/splits and merged manifest; confirm whether its actual `VpnService` and binding permission are declared.
   - [ ] Determine whether OK invokes `VpnService.prepare()`, which Android activity/component is launched, and whether the process crashes, is killed or exits normally.
-  - [ ] Inspect Android Package Manager service-query support on this WSA build. Distinguish unsupported/failed query from no declared VPN service; do not treat PacMan's empty list as proof by itself.
+  - [ ] Distinguish an unsupported Package Manager command/query from a genuinely absent VPN service. The supported device-wide query is `cmd package query-services --brief --components -a android.net.VpnService`; get MystNodes-specific service/permission details from `dumpsys package network.mysterium.provider`. Do not invent a `-p` filter.
   - [ ] Choose the smallest evidence-based correction: official MystNodes guidance/update, Android permission hand-off, PacMan discovery/launch fix, or a specifically justified WSA compatibility change with explicit user approval.
   - [ ] Test that the genuine Android consent screen appears inside WSA, the user can approve it, MystNodes remains running and its node/service startup is verifiable.
   - [ ] Confirm no Windows routes/DNS/firewall/VPN state changes and preserve existing WSA registration, MystNodes data and Android user data.
   - [ ] Record sanitised evidence, root cause, tests, limitations and recovery steps in Git.
-- [ ] **Approval gate:** Planning only. Do not reproduce, collect logs, download/update/install APKs, change settings or modify code until the user explicitly says **"let's go"**.
+- [x] **Approval gate:** The user authorised execution with "let's go". Continue with read-only diagnostics and PacMan tooling. Any destructive action, app-data reset, APK modification, security change or WSA networking change still needs a separate explicit approval.
 
 See [docs/MYSTNODES_WSA_COMPATIBILITY_PLAN.md](docs/MYSTNODES_WSA_COMPATIBILITY_PLAN.md) for the detailed investigation sequence, safety boundaries and acceptance tests.
 

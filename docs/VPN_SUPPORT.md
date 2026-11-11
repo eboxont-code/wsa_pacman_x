@@ -45,9 +45,15 @@ This feature controls Android VPN apps and Android app traffic inside WSA only. 
 7. Treat a service declaration as a discovery signal, not a guarantee that every provider feature works under WSA.
 8. Validate package names before embedding them in shell commands.
 
+## MystNodes startup permission behaviour
+
+The selected MystNodes app is `network.mysterium.provider`. Current upstream source calls Android `VpnService.prepare()` on startup. If the VPN activity result is not `RESULT_OK`, MystNodes displays **"VPN connection has to be granted for Myst Nodes to work"**; acknowledging that error calls `finishAndRemoveTask()`. This can explain why the entire app window closes without implying a crash. The installed package version and merged service declaration must still be checked on the user's WSA instance; see [the MystNodes compatibility plan](MYSTNODES_WSA_COMPATIBILITY_PLAN.md).
+
 ## All-Android-app VPN configuration
 
-For one provider to cover the Android apps in WSA, users connect the provider app, then select it in Android VPN settings and enable **Always-on VPN**. Enabling **Block connections without VPN** applies Android lockdown: apps cannot fall back to the ordinary Android network when the tunnel is down. Provider-level split-tunnel or per-app exclusions must also be reviewed because PacMan cannot override a provider's own routing choices. These controls apply to the WSA Android user only; Windows desktop traffic is outside this VPN.
+For a **conventional full-tunnel VPN client**, Android can apply one selected VPN to apps in the WSA Android user. After connecting the provider, users may choose **Always-on VPN** and **Block connections without VPN** if the provider supports and recommends them. Review provider-level split-tunnel or per-app exclusions; PacMan cannot override those routing choices. These controls apply to the WSA Android user only; Windows desktop traffic is outside this VPN.
+
+**MystNodes is the selected bandwidth-sharing node app, not assumed to be a conventional full-tunnel VPN client.** Its VPN permission prompt alone does not establish that Always-on VPN or lockdown is appropriate. Do not recommend either setting for MystNodes unless MystNodes documents that configuration.
 
 ## Remaining work and validation
 

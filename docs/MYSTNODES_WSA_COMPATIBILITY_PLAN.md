@@ -1,6 +1,6 @@
 # MystNodes compatibility and crash investigation plan for WSA PacMan
 
-**Status:** Planning only — do not begin implementation or make changes to the user's PC until the user explicitly says: **"let's go"**.  
+**Status:** Execution authorised by the user. Current work is read-only diagnosis support and PacMan diagnostic tooling; no WSA setting, Windows network setting or MystNodes app data has been changed.  
 **Chosen application:** MystNodes Android app.  
 **Package identifier supplied for the installed app:** `network.mysterium.provider`.  
 **Scope:** Make this exact MystNodes app operate reliably inside the user's existing Windows Subsystem for Android (WSA) installation, with PacMan assisting diagnosis and launch. No replacement application is in scope.
@@ -18,6 +18,27 @@ Observed behaviour reported by the user:
 5. PacMan's **Find VPN apps** screen currently reports that no installed apps declaring an Android VPN service were found.
 
 These observations are symptoms, not a confirmed root cause. In particular, the PacMan discovery result alone does not prove that the APK lacks a VPN service: the query could be unsupported by this WSA image, the output format may differ, or the installed package may have a service/manifest issue. Do not assume the cause before collecting evidence.
+
+## 1A. Upstream MystNodes startup-flow review (current source; installed build still to verify)
+
+A review of the public `mysteriumnetwork/mysterium-mobile-provider` repository's current `master` source found a direct explanation for the reported whole-app closure:
+
+- The current upstream `android/app/src/main/java/network/mysterium/provider/ui/screens/launch/LaunchViewModel.kt` starts with `Launch.Effect.RequestVpnPermission`.
+- `LaunchScreen.kt` calls Android's `VpnService.prepare(context)`. If Android returns an Intent, MystNodes launches it using `ActivityResultContracts.StartActivityForResult`.
+- The activity-result callback continues setup only when `resultCode == Activity.RESULT_OK`. Any other result posts `Launch.Event.DeclinedVpnPermission`.
+- `LaunchViewModel.kt` maps that event to `R.string.missing_vpn_permission`, whose text is the exact message reported by the user: **"VPN connection has to be granted for Myst Nodes to work"**.
+- When the user taps OK, `ConfirmedInitError` posts `Launch.Effect.CloseApp`; `LaunchScreen.kt` handles that effect by calling `finishAndRemoveTask()`.
+
+**Interpretation:** if the installed MystNodes build follows this upstream code, the window closing after OK is an intentional error-path exit because Android did not return an approved VPN-consent result. It is not, by itself, proof of a native crash. The unresolved fault is why the genuine Android VPN approval flow is not returning `RESULT_OK` in this WSA instance.
+
+Relevant upstream source:
+- [LaunchScreen.kt — VPN preparation and activity result](https://github.com/mysteriumnetwork/mysterium-mobile-provider/blob/master/android/app/src/main/java/network/mysterium/provider/ui/screens/launch/LaunchScreen.kt)
+- [LaunchViewModel.kt — declined permission and close-app flow](https://github.com/mysteriumnetwork/mysterium-mobile-provider/blob/master/android/app/src/main/java/network/mysterium/provider/ui/screens/launch/LaunchViewModel.kt)
+- [MystNodes app manifest](https://github.com/mysteriumnetwork/mysterium-mobile-provider/blob/master/android/app/src/main/AndroidManifest.xml)
+- [Node module manifest](https://github.com/mysteriumnetwork/mysterium-mobile-provider/blob/master/android/node/src/main/AndroidManifest.xml)
+- [Android dependency versions](https://github.com/mysteriumnetwork/mysterium-mobile-provider/blob/master/android/gradle/libs.versions.toml)
+
+The current upstream app Gradle file declares package `network.mysterium.provider`, version name `5.2.2`, version code `11`, and depends on the separately released `provider-mobile-node` library, currently version `1.38.1` in that source tree. The app manifest and node-module manifest do not themselves show an explicit `VpnService` declaration; the prebuilt node AAR may contribute merged manifest components. **Do not conclude that the installed APK lacks the service from source manifests alone.** The user's actual installed app version and merged Package Manager service declarations must be read from WSA.
 
 ## 2. Goal and boundaries
 
@@ -49,7 +70,7 @@ Identify why MystNodes exits after the user acknowledges its VPN-permission mess
 1. Record the WSA Android version/build, WSA package/runtime version, PacMan version, Windows build, host CPU architecture and MystNodes installed version.
 2. Record WSA networking configuration as read-only observations, including **Local network access** and any available advanced-networking mode. Do not toggle anything.
 3. Confirm the installed package name and location without uninstalling, updating or clearing its data.
-4. Start a time-bounded, read-only Android log capture before opening MystNodes. Preserve the existing log buffer; do not clear logs as a first step.
+4. Use PacMan's **Capture MystNodes diagnostic** button after reproducing the exit. It reads the existing recent log buffer with `logcat -d`; it does not clear logs. The capture also reads package version/components, APK paths, VPN service query responses and process-exit history.
 5. Reproduce exactly once: open MystNodes, wait for its message, tap OK and record the precise timestamp and whether the process/window exits.
 6. Save a sanitised diagnostic record locally. Redact account identifiers, tokens, wallet/payment details, personal paths and other private information before sharing any output.
 
@@ -98,8 +119,8 @@ cmd package query-services --brief --components -a android.net.VpnService
 
 Verify whether the exact command is supported by this WSA Android build and inspect its raw stdout/stderr and exit code.
 
-- Compare supported `cmd package` / `pm` query forms for the installed Android version.
-- Inspect `dumpsys package network.mysterium.provider` for declared services and intent filters if the query is unavailable or returns nothing.
+- Use the supported device-wide query form `cmd package query-services --brief --components -a android.net.VpnService`; Android's PackageManager shell query does not offer a `-p PACKAGE` package filter for this command.
+- Inspect `dumpsys package network.mysterium.provider` for declared services, permissions and intent filters; do not treat an unsupported query or an empty output as proof that the package lacks a VPN service.
 - Distinguish **query unsupported**, **query failed**, **no matching service**, and **service found but not launchable**. Do not collapse these states into "no VPN apps found".
 - If the service exists, validate its component and binding permission before listing it as a VPN provider.
 - Verify PacMan passes the exact package/component to Android without shell injection or guessing.
@@ -141,8 +162,8 @@ Do not mark the work complete based on a code build alone. Test the exact MystNo
 - A real WSA test record covering permission approval and node startup.
 - Updated README, VPN documentation and `MASTER_TODO.md` with completed vs. outstanding items clearly separated.
 
-## 10. Approval gate
+## 10. Execution and approval boundary
 
-**This document is the plan only.** Do not run the diagnostic reproduction, collect logs, download/install/update MystNodes, change Windows/WSA settings, change PacMan code, create a feature implementation branch, or alter app data until the user explicitly says **"let's go"**.
+The user has explicitly authorised execution by saying **"let's go"**. The current implementation adds a local PacMan diagnostic report; it does not automatically collect logs in the background, upload reports, clear logcat, install/update MystNodes, alter app data or change WSA/Windows settings.
 
-When authorised, execute Phase A onward in order. Stop and report before any step that would require a destructive action, a security change, an app-data reset, an APK modification or an unplanned WSA networking change.
+Next: build and test the PacMan diagnostic feature, let the user install that build, then ask them to reproduce once and copy the report from PacMan. Review the report before any change to MystNodes or WSA. Any destructive action, app-data reset, APK modification, security change or WSA networking change still requires a separate, explicit explanation and approval.

@@ -62,11 +62,12 @@ Install a compatible Android VPN client APK with PacMan, then open PacMan's **WS
 
 Use **Open Android VPN settings** to open the VPN page inside Android in WSA. PacMan launches the explicit Android Settings VPN activity rather than the implicit VPN settings intent, which WSA may redirect to Windows Settings. If the VPN page is unavailable in a particular WSA image, PacMan falls back to the main Android Settings screen; it never opens Windows VPN settings.
 
-**To route and protect all Android apps in WSA with one VPN:**
-1. Open the selected provider app and connect it.
-2. In Android VPN settings, select that provider and turn on **Always-on VPN**.
-3. Turn on **Block connections without VPN** (Android's VPN lockdown) if you want apps to lose network access whenever the VPN is disconnected.
-4. Check the provider's own split-tunneling or per-app exclusions. PacMan cannot override a provider's app exclusions; the lockdown setting prevents excluded apps from silently using the ordinary network.
+**For a conventional full-tunnel VPN client**, Android can route all WSA Android apps through one selected provider:
+1. Open the provider app and connect it.
+2. Follow that provider's instructions for **Always-on VPN** and **Block connections without VPN** (lockdown), if supported and appropriate.
+3. Check the provider's split-tunnel or per-app exclusions. PacMan cannot override provider routing choices.
+
+**MystNodes is being investigated as a bandwidth-sharing node, not assumed to be a conventional full-tunnel VPN client.** Its VPN permission prompt alone does not establish that Always-on VPN or lockdown is appropriate. Do not enable those options for MystNodes unless MystNodes explicitly documents that configuration.
 
 Android permits one active VPN service per Android user/profile. Each provider owns its account, server choices, protocol, configuration and tunnel. PacMan does not provide a VPN service, collect VPN credentials or claim a tunnel is connected just because an app was launched. Android's VPN service applies to the WSA Android user and its apps only — it does **not** route Windows desktop applications through the tunnel.
 
@@ -108,6 +109,7 @@ The Windows workflow also validates the PowerShell runtime helper and installer 
 - [Windows CI guide](docs/CI.md) — workflow triggers, validation steps and build artifact handling.
 - [VPN support](docs/VPN_SUPPORT.md) — provider discovery, Android consent, WSA scope and safety.
 - [MystNodes WSA compatibility plan](docs/MYSTNODES_WSA_COMPATIBILITY_PLAN.md) — investigation plan for the selected MystNodes app's VPN permission hand-off and app exit.
+- PacMan's **Capture MystNodes diagnostic** report gathers installed package/service details and recent filtered Android logs locally; it does not clear logs or upload them.
 - [Contributing guide](CONTRIBUTING.md) — local checks, branch and pull request standards.
 - [Security policy](SECURITY.md) — how to report a vulnerability privately.
 
