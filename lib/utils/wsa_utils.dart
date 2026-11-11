@@ -40,6 +40,7 @@ class WSAUtils {
       ipAddress,
       port,
       'cmd package query-services --brief --components -a android.net.VpnService',
+      maxOutputCharacters: 2000,
     );
     if (result.exitCode != 0) {
       final output = [
@@ -74,18 +75,29 @@ class WSAUtils {
   }) async {
     final results = <MystNodesDiagnosticCommandResult>[];
 
-    Future<void> capture(String label, String command,
-        {bool filterLogs = false}) async {
+    Future<void> capture(
+      String label,
+      String command, {
+      bool filterLogs = false,
+      int maxOutputCharacters = 2500,
+    }) async {
       try {
         final result = await ADBUtils.shellToAddress(ipAddress, port, command);
-        final stdout = filterLogs
-            ? selectMystNodesRelevantLogLines(result.stdout?.toString() ?? '')
-            : (result.stdout?.toString() ?? '');
+        final rawStdout = result.stdout?.toString() ?? '';
+        final selectedOutput = filterLogs
+            ? selectMystNodesRelevantLogLines(rawStdout, maxLines: 180)
+            : rawStdout;
         results.add(MystNodesDiagnosticCommandResult(
           label: label,
           exitCode: result.exitCode,
-          stdout: stdout,
-          stderr: result.stderr?.toString() ?? '',
+          stdout: limitMystNodesDiagnosticSection(
+            selectedOutput,
+            maxCharacters: maxOutputCharacters,
+          ),
+          stderr: limitMystNodesDiagnosticSection(
+            result.stderr?.toString() ?? '',
+            maxCharacters: 1200,
+          ),
         ));
       } catch (error) {
         results.add(MystNodesDiagnosticCommandResult(
@@ -107,6 +119,7 @@ class WSAUtils {
     await capture(
       'Installed MystNodes package and merged component metadata',
       'dumpsys package $mystNodesPackageName',
+      maxOutputCharacters: 6500,
     );
     await capture(
       'Device-wide Android VPN service query',
@@ -115,15 +128,18 @@ class WSAUtils {
     await capture(
       'MystNodes-only Android VPN service query',
       'cmd package query-services --brief --components -p $mystNodesPackageName -a android.net.VpnService',
+      maxOutputCharacters: 2000,
     );
     await capture(
       'Recent MystNodes process exit history',
       'dumpsys activity exit-info $mystNodesPackageName',
+      maxOutputCharacters: 3000,
     );
     await capture(
       'Recent MystNodes, VPN permission and Android lifecycle logs (filtered)',
       'logcat -d -v threadtime -t 2500',
       filterLogs: true,
+      maxOutputCharacters: 9000,
     );
 
     return buildMystNodesDiagnosticReport(
