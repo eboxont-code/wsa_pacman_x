@@ -1,6 +1,6 @@
 # MystNodes compatibility and crash investigation plan for WSA PacMan
 
-**Status:** Execution authorised by the user. The first read-only WSA diagnostic report has been received and reviewed. No WSA setting, Windows network setting or MystNodes app data has been changed. The confirmed findings and remaining evidence gaps are recorded below.  
+**Status:** Execution authorised by the user. Two read-only WSA diagnostic reports have been received and reviewed. The restriction and VPN-dialog identity failure are documented; installed APK manifest inspection is being added to PacMan. No WSA setting, Windows network setting or MystNodes app data has been changed.  
 **Chosen application:** MystNodes Android app.  
 **Package identifier supplied for the installed app:** `network.mysterium.provider`.  
 **Scope:** Make this exact MystNodes app operate reliably inside the user's existing Windows Subsystem for Android (WSA) installation, with PacMan assisting diagnosis and launch. No replacement application is in scope.
@@ -207,6 +207,8 @@ Do not mark the work complete based on a code build alone. Test the exact MystNo
 
 ## 10. Execution and approval boundary
 
-The user has explicitly authorised execution by saying **"let's go"**. The current implementation adds a local PacMan diagnostic report; it does not automatically collect logs in the background, upload reports, clear logcat, install/update MystNodes, alter app data or change WSA/Windows settings.
+The user has explicitly authorised execution by saying **"let's go"**. PacMan's diagnostic report is local and on-demand. The second-stage report has now identified the user restriction state and the AppOps UID/package mismatch in the Android VPN consent path.
 
-Next: build and test the PacMan diagnostic feature, let the user install that build, then ask them to reproduce once and copy the report from PacMan. Review the report before any change to MystNodes or WSA. Any destructive action, app-data reset, APK modification, security change or WSA networking change still requires a separate, explicit explanation and approval.
+The next PacMan update adds read-only inspection of the installed MystNodes base APK manifest: PacMan temporarily pulls only `base.apk` to a local Windows temporary folder, runs the bundled AAPT2 tool to read `AndroidManifest.xml`, records service declarations, then deletes the temporary folder. It does not install, modify or upload the APK, and it does not read or alter MystNodes app data.
+
+Next: pass the full Flutter and Windows packaging workflow, merge the tested change, and let the user install the new PacMan diagnostic build. The resulting report must establish whether the installed APK declares a service protected by `BIND_VPN_SERVICE` with the `android.net.VpnService` action. Any attempt to remove `no_config_vpn`, alter WSA security/framework files, patch or replace MystNodes, reset app data, or change Windows/WSA networking requires a separate explicit explanation and approval.
