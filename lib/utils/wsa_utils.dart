@@ -435,10 +435,7 @@ extension ADBUtils on Future<ProcessResult> {
     String remotePath,
     String localPath,
   ) {
-    if (!remotePath.startsWith('/data/app/') ||
-        !remotePath.endsWith('/base.apk') ||
-        remotePath.contains('..') ||
-        RegExp(r'[\\s\\x00]').hasMatch(remotePath)) {
+    if (!isSafeMystNodesBaseApkPath(remotePath)) {
       return Future.error(ArgumentError.value(
         remotePath,
         'remotePath',
