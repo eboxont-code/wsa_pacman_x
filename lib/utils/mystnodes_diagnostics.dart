@@ -61,6 +61,22 @@ String sanitizeMystNodesDiagnosticText(String value) {
   return result.join('\n');
 }
 
+/// Sanitizes and bounds one command result so a large Package Manager
+/// dump cannot push the more useful process-exit and permission logs out of
+/// the diagnostic report.
+String limitMystNodesDiagnosticSection(
+  String value, {
+  int maxCharacters = 2500,
+}) {
+  final safe = sanitizeMystNodesDiagnosticText(value);
+  if (safe.length <= maxCharacters) return safe;
+  final marker = '\\n[Section truncated at $maxCharacters characters.]';
+  final available = maxCharacters > marker.length
+      ? maxCharacters - marker.length
+      : 0;
+  return safe.substring(0, available) + marker;
+}
+
 /// Selects recent Android logcat lines relevant to MystNodes, Android VPN
 /// consent, package/service resolution and app/activity termination. Nearby
 /// lines are included for stack traces and ActivityResult context.
