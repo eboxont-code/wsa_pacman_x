@@ -2,7 +2,7 @@
 
 ## Goal
 
-Manage compatible Android VPN clients inside Windows Subsystem for Android (WSA) through WSA PacMan. Support is provider-neutral; MystNodes is one possible Android app, not a special case.
+Manage Android VPN-capable applications inside Windows Subsystem for Android (WSA) through WSA PacMan. The user has selected MystNodes (`network.mysterium.provider`) as the final app to get working in WSA. Do not substitute another Mysterium application. The provider-neutral discovery feature remains general, but the current compatibility investigation is specifically for MystNodes; see [the MystNodes WSA compatibility plan](MYSTNODES_WSA_COMPATIBILITY_PLAN.md).
 
 ## Implemented
 
