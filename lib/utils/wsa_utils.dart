@@ -118,7 +118,6 @@ class WSAUtils {
     await capture(
       'Installed MystNodes package and merged component metadata',
       "dumpsys package $mystNodesPackageName | grep -i -C 5 -E 'versionName|versionCode|VpnService|BIND_VPN_SERVICE|NodeService'",
-      maxOutputCharacters: 6500,
     );
     await capture(
       'Device-wide Android VPN service query',
@@ -127,18 +126,15 @@ class WSAUtils {
     await capture(
       'MystNodes-only Android VPN service query',
       'cmd package query-services --brief --components -p $mystNodesPackageName -a android.net.VpnService',
-      maxOutputCharacters: 2000,
     );
     await capture(
       'Recent MystNodes process exit history',
       'dumpsys activity exit-info $mystNodesPackageName',
-      maxOutputCharacters: 3000,
     );
     await capture(
       'Recent MystNodes, VPN permission and Android lifecycle logs (filtered)',
       'logcat -d -v threadtime -t 2500',
       filterLogs: true,
-      maxOutputCharacters: 9000,
     );
 
     return buildMystNodesDiagnosticReport(
