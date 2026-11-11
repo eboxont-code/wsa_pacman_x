@@ -83,6 +83,8 @@ The second read-only report confirms the user restriction state and captures the
 
 **Current interpretation:** the VPN consent route is blocked by the WSA Android restriction and shows an additional package/UID identity error in the framework path. The actual service declaration is still unconfirmed. No system restriction, WSA security setting, Android app data or Windows network configuration has been changed.
 
+**Security-sensitive option deliberately not shipped:** Android 13's AOSP default for `ACTIVATE_VPN` is `MODE_IGNORED`. Setting the MystNodes package's AppOps mode to `allow` would pre-authorize VPN starts and bypass the normal Android confirmation activity. Since the report also shows `no_config_vpn`, this could bypass a platform VPN-configuration restriction as well. PacMan will not set this automatically or include a one-click grant based only on the general "let's go" instruction. Review the installed base APK manifest first; any such exception requires a separate, explicit approval after explaining that Android's usual consent/policy gate would be bypassed. The proposed code was kept off `main` and the unapproved branch reset to the current main commit.
+
 ## 1D. Installed APK manifest inspector shipped in PacMan (build #343)
 
 PR #35 adds a read-only inspection step to the MystNodes diagnostic report:
