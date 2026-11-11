@@ -113,6 +113,78 @@ String selectMystNodesRelevantLogLines(
   );
 }
 
+/// Keeps the user/restriction source labels around VPN policy state.
+///
+/// Android's user dump may show base restrictions separately from device
+/// policy local/global restrictions. Keeping the surrounding labels prevents
+/// a restriction from being incorrectly attributed to an administrator.
+String selectMystNodesRestrictionContext(
+  String dumpOutput, {
+  int maxLines = 100,
+}) {
+  final lines = dumpOutput.split(RegExp(r'\\r?\\n'));
+  final anchor = RegExp(
+    r'(no_config_vpn|DISALLOW_CONFIG_VPN|base restrictions|user restrictions|device policy local restrictions|device policy global restrictions|restriction source|UserInfo)',
+    caseSensitive: false,
+  );
+  final selected = <int>{};
+
+  for (var i = 0; i < lines.length; i++) {
+    if (!anchor.hasMatch(lines[i])) continue;
+    final start = i > 5 ? i - 5 : 0;
+    final end = (i + 10 < lines.length) ? i + 10 : lines.length - 1;
+    for (var j = start; j <= end; j++) {
+      selected.add(j);
+    }
+  }
+
+  final indices = selected.toList()..sort();
+  final bounded = indices.length > maxLines
+      ? indices.sublist(0, maxLines)
+      : indices;
+  if (bounded.isEmpty) {
+    return '[No VPN restriction source labels were visible in the Android user dump.]';
+  }
+  return sanitizeMystNodesDiagnosticText(
+    bounded.map((index) => lines[index]).join('\\n'),
+  );
+}
+
+/// Extracts only the installed package's service/component section and nearby
+/// VPN declarations from its Package Manager dump. Empty output is not proof
+/// that a service is absent because Android dump formats vary by build.
+String selectMystNodesPackageServiceMetadata(
+  String packageDump, {
+  int maxLines = 100,
+}) {
+  final lines = packageDump.split(RegExp(r'\\r?\\n'));
+  final anchor = RegExp(
+    r'(Services:|Service Resolver Table|android\\.net\\.VpnService|BIND_VPN_SERVICE|VpnService|NodeService|ServiceRecord|ServiceInfo)',
+    caseSensitive: false,
+  );
+  final selected = <int>{};
+
+  for (var i = 0; i < lines.length; i++) {
+    if (!anchor.hasMatch(lines[i])) continue;
+    final start = i > 4 ? i - 4 : 0;
+    final end = (i + 12 < lines.length) ? i + 12 : lines.length - 1;
+    for (var j = start; j <= end; j++) {
+      selected.add(j);
+    }
+  }
+
+  final indices = selected.toList()..sort();
+  final bounded = indices.length > maxLines
+      ? indices.sublist(0, maxLines)
+      : indices;
+  if (bounded.isEmpty) {
+    return '[No service/component declaration lines were visible in the MystNodes package dump; this alone does not prove the APK has no VPN service.]';
+  }
+  return sanitizeMystNodesDiagnosticText(
+    bounded.map((index) => lines[index]).join('\\n'),
+  );
+}
+
 String buildMystNodesDiagnosticReport({
   required DateTime capturedAt,
   required List<MystNodesDiagnosticCommandResult> commands,
