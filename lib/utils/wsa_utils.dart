@@ -8,6 +8,7 @@ import 'package:wsa_pacman/windows/win_io.dart';
 import 'package:wsa_pacman/windows/win_pkg.dart';
 import 'wsa_settings_launcher.dart';
 import 'vpn_support.dart';
+import 'mystnodes_diagnostics.dart';
 import '../utils/string_utils.dart';
 import '../utils/regexp_utils.dart';
 
@@ -49,7 +50,86 @@ class WSAUtils {
           ? 'Android Package Manager could not query VPN services (exit code ${result.exitCode}).'
           : output);
     }
-    return parseVpnServiceQuery(result.stdout?.toString() ?? '');
+    final output = result.stdout?.toString() ?? '';
+    final providers = parseVpnServiceQuery(output);
+    final explicitlyEmpty = RegExp(
+      r'no services found|no matching services',
+      caseSensitive: false,
+    ).hasMatch(output);
+    if (providers.isEmpty && !explicitlyEmpty) {
+      throw FormatException(
+        'Android Package Manager returned output PacMan could not interpret. '
+        'Use the MystNodes diagnostic report to inspect the raw response.',
+        output,
+      );
+    }
+    return providers;
+  }
+
+  /// Captures a local, read-only diagnostic report for the selected MystNodes
+  /// package. It never clears logcat, changes settings or uploads the report.
+  static Future<String> captureMystNodesDiagnostic({
+    required String ipAddress,
+    required int port,
+  }) async {
+    final results = <MystNodesDiagnosticCommandResult>[];
+
+    Future<void> capture(String label, String command,
+        {bool filterLogs = false}) async {
+      try {
+        final result = await ADBUtils.shellToAddress(ipAddress, port, command);
+        final stdout = filterLogs
+            ? selectMystNodesRelevantLogLines(result.stdout?.toString() ?? '')
+            : (result.stdout?.toString() ?? '');
+        results.add(MystNodesDiagnosticCommandResult(
+          label: label,
+          exitCode: result.exitCode,
+          stdout: stdout,
+          stderr: result.stderr?.toString() ?? '',
+        ));
+      } catch (error) {
+        results.add(MystNodesDiagnosticCommandResult(
+          label: label,
+          exitCode: -1,
+          stderr: error.toString(),
+        ));
+      }
+    }
+
+    await capture('Android release', 'getprop ro.build.version.release');
+    await capture('Android SDK level', 'getprop ro.build.version.sdk');
+    await capture('Android CPU ABI', 'getprop ro.product.cpu.abi');
+    await capture('Android supported ABIs', 'getprop ro.product.cpu.abilist');
+    await capture(
+      'Installed MystNodes APK paths',
+      'pm path $mystNodesPackageName',
+    );
+    await capture(
+      'Installed MystNodes package and merged component metadata',
+      'dumpsys package $mystNodesPackageName',
+    );
+    await capture(
+      'Device-wide Android VPN service query',
+      'cmd package query-services --brief --components -a android.net.VpnService',
+    );
+    await capture(
+      'MystNodes-only Android VPN service query',
+      'cmd package query-services --brief --components -p $mystNodesPackageName -a android.net.VpnService',
+    );
+    await capture(
+      'Recent MystNodes process exit history',
+      'dumpsys activity exit-info $mystNodesPackageName',
+    );
+    await capture(
+      'Recent MystNodes, VPN permission and Android lifecycle logs (filtered)',
+      'logcat -d -v threadtime -t 2500',
+      filterLogs: true,
+    );
+
+    return buildMystNodesDiagnosticReport(
+      capturedAt: DateTime.now(),
+      commands: results,
+    );
   }
 
   /// Opens the launch activity of a discovered Android VPN provider.
