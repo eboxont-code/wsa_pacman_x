@@ -66,6 +66,12 @@
     "wsa_vpn_settings_failed": "Could not open Android VPN settings inside WSA. Open Android Settings and go to Network & Internet, then VPN.",
     "wsa_vpn_launch_failed": "Could not open this VPN app. It may not provide a launcher activity.",
     "wsa_vpn_connect_first": "Connect to WSA to discover and open Android VPN apps.",
+    "wsa_mystnodes_capture_report": "Capture MystNodes diagnostic",
+    "wsa_mystnodes_capturing": "Collecting Android diagnostics...",
+    "wsa_mystnodes_capture_hint": "After MystNodes closes, return here and capture the report. It reads package details and recent Android logs only; nothing is uploaded.",
+    "wsa_mystnodes_diagnostic_title": "MystNodes diagnostic report",
+    "wsa_mystnodes_copy_report": "Copy report",
+    "wsa_mystnodes_close_report": "Close",
 
     
     "settings_port": "WSA Port",
