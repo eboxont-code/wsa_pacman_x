@@ -58,13 +58,13 @@ void main() {
   group('MystNodes restriction and package metadata selection', () {
     test('preserves labels needed to attribute a VPN user restriction', () {
       final selected = selectMystNodesRestrictionContext(
-        'UserInfo{0:Owner}\\n'
-        '  Base restrictions:\\n'
-        '    no_config_vpn\\n'
-        '  Device policy local restrictions:\\n'
-        '    null\\n'
-        '  Device policy global restrictions:\\n'
-        '    null\\n',
+        'UserInfo{0:Owner}\n'
+        '  Base restrictions:\n'
+        '    no_config_vpn\n'
+        '  Device policy local restrictions:\n'
+        '    null\n'
+        '  Device policy global restrictions:\n'
+        '    null\n',
       );
 
       expect(selected, contains('Base restrictions:'));
@@ -75,12 +75,12 @@ void main() {
 
     test('keeps declared VPN service and binding permission lines', () {
       final selected = selectMystNodesPackageServiceMetadata(
-        'Package [network.mysterium.provider]\\n'
-        '  Services:\\n'
-        '    network.mysterium.provider/.NodeService:\\n'
-        '      permission=android.permission.BIND_VPN_SERVICE\\n'
-        '      Action: android.net.VpnService\\n'
-        '  Receivers:\\n',
+        'Package [network.mysterium.provider]\n'
+        '  Services:\n'
+        '    network.mysterium.provider/.NodeService:\n'
+        '      permission=android.permission.BIND_VPN_SERVICE\n'
+        '      Action: android.net.VpnService\n'
+        '  Receivers:\n',
       );
 
       expect(selected, contains('NodeService'));
@@ -91,8 +91,8 @@ void main() {
 
     test('does not claim a missing service when the dump has no matching lines', () {
       final selected = selectMystNodesPackageServiceMetadata(
-        'Package [network.mysterium.provider]\\n'
-        '  versionName=5.2.2\\n',
+        'Package [network.mysterium.provider]\n'
+        '  versionName=5.2.2\n',
       );
 
       expect(selected, contains('does not prove the APK has no VPN service'));
