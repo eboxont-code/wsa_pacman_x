@@ -78,14 +78,20 @@ class WSAUtils {
       String label,
       String command, {
       bool filterLogs = false,
+      bool filterRestrictionContext = false,
+      bool filterPackageServices = false,
       int maxOutputCharacters = 2500,
     }) async {
       try {
         final result = await ADBUtils.shellToAddress(ipAddress, port, command);
         final rawStdout = result.stdout?.toString() ?? '';
         final selectedOutput = filterLogs
-            ? selectMystNodesRelevantLogLines(rawStdout, maxLines: 180)
-            : rawStdout;
+            ? selectMystNodesRelevantLogLines(rawStdout, maxLines: 140)
+            : filterRestrictionContext
+                ? selectMystNodesRestrictionContext(rawStdout)
+                : filterPackageServices
+                    ? selectMystNodesPackageServiceMetadata(rawStdout)
+                    : rawStdout;
         results.add(MystNodesDiagnosticCommandResult(
           label: label,
           exitCode: result.exitCode,
@@ -135,14 +141,31 @@ class WSAUtils {
       maxOutputCharacters: 500,
     );
     await capture(
-      'Android VPN configuration restrictions (read-only)',
-      "dumpsys user | grep -i -C 2 -E 'no_config_vpn|DISALLOW_CONFIG_VPN'",
+      'Android user VPN restriction source and context (read-only)',
+      'dumpsys user',
+      filterRestrictionContext: true,
+      maxOutputCharacters: 3000,
+    );
+    await capture(
+      'Android device and profile policy owners (read-only)',
+      'cmd device_policy list-owners',
       maxOutputCharacters: 1500,
     );
     await capture(
-      'Installed MystNodes package and merged component metadata',
-      "dumpsys package $mystNodesPackageName | grep -i -C 5 -E 'versionName|versionCode|VpnService|BIND_VPN_SERVICE|NodeService'",
-      maxOutputCharacters: 6500,
+      'Android device policy VPN restriction context (read-only)',
+      "dumpsys device_policy | grep -i -C 5 -E 'Device Owner:|Profile Owner|admin=ComponentInfo|no_config_vpn|vpn'",
+      maxOutputCharacters: 3500,
+    );
+    await capture(
+      'Installed MystNodes package version and identity metadata',
+      "dumpsys package $mystNodesPackageName | grep -i -C 4 -E 'versionName|versionCode|primaryCpuAbi|secondaryCpuAbi|signing|signatures|firstInstallTime|installSource'",
+      maxOutputCharacters: 3500,
+    );
+    await capture(
+      'Complete MystNodes service and VPN component declarations (read-only)',
+      'dumpsys package $mystNodesPackageName',
+      filterPackageServices: true,
+      maxOutputCharacters: 5000,
     );
     await capture(
       'Device-wide Android VPN service query (supported Package Manager syntax)',
@@ -154,10 +177,9 @@ class WSAUtils {
       maxOutputCharacters: 3000,
     );
     await capture(
-      'Recent MystNodes, VPN permission and Android lifecycle logs (filtered)',
-      'logcat -d -v threadtime -t 2500',
-      filterLogs: true,
-      maxOutputCharacters: 9000,
+      'Recent MystNodes VPN-consent, policy and app-lifecycle logs (filtered)',
+      String.raw`logcat -d -v threadtime -t 4000 | grep -i -E 'network\\.mysterium\\.provider|MystNodes|VpnService|VpnManager|VpnDialogs|VpnConfirm|com\\.android\\.vpndialogs|ConfirmDialog|BIND_VPN_SERVICE|no_config_vpn|DISALLOW_CONFIG_VPN|AndroidRuntime|FATAL EXCEPTION|Permission Denial|SecurityException|DevicePolicyManager|ActivityTaskManager|ActivityManager|ActivityResult|resultCode' | tail -n 180`,
+      maxOutputCharacters: 7000,
     );
 
     return buildMystNodesDiagnosticReport(
