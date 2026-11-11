@@ -2,6 +2,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wsa_pacman/utils/vpn_support.dart';
 
 void main() {
+  group('Android VPN settings launch', () {
+    test('targets Android VPN settings activity explicitly inside WSA', () {
+      expect(
+        androidVpnSettingsComponent,
+        r'com.android.settings/.Settings$VpnSettingsActivity',
+      );
+      expect(
+        buildAndroidVpnSettingsCommand(),
+        r"am start -n 'com.android.settings/.Settings$VpnSettingsActivity'",
+      );
+      expect(
+        buildAndroidVpnSettingsCommand(),
+        isNot(contains('android.settings.VPN_SETTINGS')),
+      );
+      expect(
+        buildAndroidVpnSettingsCommand(),
+        isNot(contains('ms-settings:')),
+      );
+    });
+
+    test('fallback remains in Android Settings, never Windows Settings', () {
+      expect(
+        buildAndroidSettingsFallbackCommand(),
+        "am start -n 'com.android.settings/.Settings'",
+      );
+      expect(
+        buildAndroidSettingsFallbackCommand(),
+        isNot(contains('ms-settings:')),
+      );
+    });
+  });
+
   group('parseVpnServiceQuery', () {
     test('parses compact relative and fully qualified service components', () {
       final providers = parseVpnServiceQuery(
