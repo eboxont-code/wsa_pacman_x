@@ -107,6 +107,7 @@ The Windows workflow also validates the PowerShell runtime helper and installer 
 - [Repository structure](docs/REPOSITORY_STRUCTURE.md) — what belongs in each directory and which assets are intentionally tracked.
 - [Windows CI guide](docs/CI.md) — workflow triggers, validation steps and build artifact handling.
 - [VPN support](docs/VPN_SUPPORT.md) — provider discovery, Android consent, WSA scope and safety.
+- [MystNodes WSA compatibility plan](docs/MYSTNODES_WSA_COMPATIBILITY_PLAN.md) — investigation plan for the selected MystNodes app's VPN permission hand-off and app exit.
 - [Contributing guide](CONTRIBUTING.md) — local checks, branch and pull request standards.
 - [Security policy](SECURITY.md) — how to report a vulnerability privately.
 
