@@ -2,6 +2,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wsa_pacman/utils/adb_connection.dart';
 
 void main() {
+  group('WSA ADB endpoint recovery policy', () {
+    test('reconnects an offline WSA transport', () {
+      expect(shouldReconnectWsaAdbEndpoint('offline'), isTrue);
+    });
+
+    test('reconnects a host-state WSA transport', () {
+      expect(shouldReconnectWsaAdbEndpoint('host'), isTrue);
+    });
+
+    test('does not reconnect a healthy or unauthorized transport automatically', () {
+      expect(shouldReconnectWsaAdbEndpoint('device'), isFalse);
+      expect(shouldReconnectWsaAdbEndpoint('unauthorized'), isFalse);
+    });
+  });
+
   group('classifyAdbConnectOutcome', () {
     test('accepts a successful connection response', () {
       expect(
