@@ -223,14 +223,19 @@ class WSAPeriodicConnector {
           break;
         case 'offline':
           GState.adbConnectionDiagnostic.update((_) =>
-              'ADB reports ${wsaEndpoint.serial} as offline.');
+              'ADB reports ${wsaEndpoint.serial} as offline. Reconnecting automatically.');
           status = (status == ConnectionStatus.ARRESTED ||
                   status == ConnectionStatus.STARTING) && shouldWaitStart
               ? ConnectionStatus.STARTING
               : ConnectionStatus.OFFLINE;
+          if (shouldReconnectWsaAdbEndpoint(wsaEndpoint.state)) {
+            await reconnect();
+          }
           break;
         case 'host':
-          reconnect();
+          if (shouldReconnectWsaAdbEndpoint(wsaEndpoint.state)) {
+            await reconnect();
+          }
           break;
       }
     } else {

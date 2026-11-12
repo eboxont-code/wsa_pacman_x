@@ -58,6 +58,7 @@ See [docs/MYSTNODES_WSA_COMPATIBILITY_PLAN.md](docs/MYSTNODES_WSA_COMPATIBILITY_
 
 ## Priority 1 — Application reliability and usability
 
+- [x] **WSA ADB offline recovery and visible connection diagnostics.** When ADB identifies a WSA transport as `offline`, PacMan now attempts an explicit disconnect/reconnect instead of waiting indefinitely; the WSA page displays the actual ADB error and offers direct WSA Settings and Retry actions. Focused tests cover reconnect policy. Live validation on the user's WSA machine remains required.
 - [ ] Perform a real WSA smoke test for direct APK install, XAPK expansion files, upgrades, downgrades, endpoint detection and recovery after ADB reconnect.
 - [ ] Add post-install actions: **Open app** and **Create desktop shortcut** for an installed Android app.
 - [ ] Verify notification-area hide/restore behaviour on supported Windows builds, including Explorer restarting and an unavailable tray icon.

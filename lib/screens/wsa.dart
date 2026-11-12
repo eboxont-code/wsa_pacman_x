@@ -52,6 +52,7 @@ class _ScreenWSAState extends State<ScreenWSA> {
   @override
   Widget build(BuildContext context) {
     var connectionStatus = GState.connectionStatus.of(context);
+    final adbDiagnostic = GState.adbConnectionDiagnostic.of(context);
     final lang = AppLocalizations.of(context)!;
 
     const smallSpacer = SizedBox(height: 5.0);
@@ -69,23 +70,46 @@ class _ScreenWSAState extends State<ScreenWSA> {
             padding: const EdgeInsets.only(bottom: 8.0),
             child: FluentInfoBar(
               title: Text(connectionStatus.title(lang)),
-              content: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
-                Text(connectionStatus.desc(lang)),
-                if (connectionStatus.type == ConnectionStatus.ARRESTED) ...[
-                  const SizedBox(width: 15.0),
-                  Button(child: Text(lang.btn_boot), onPressed: () => WSAUtils.launch())
-                ]
-                else if (connectionStatus.type == ConnectionStatus.UNAUTHORIZED) ...[
-                  Button(child: Text(lang.btn_auth), onPressed: () => WSAPeriodicConnector.reconnect()),
-                  const SizedBox(width: 15.0),
-                  Button(child: Text(lang.btn_dev_settings), onPressed: () => WSAUtils.launchDeveloperSettings())
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(connectionStatus.desc(lang)),
+                  if (adbDiagnostic.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 5.0),
+                      child: Text(adbDiagnostic),
+                    ),
+                  if (connectionStatus.type == ConnectionStatus.OFFLINE)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 5.0),
+                      child: Text(lang.offline_developer_mode_help),
+                    ),
+                  if (connectionStatus.type == ConnectionStatus.ARRESTED) ...[
+                    const SizedBox(height: 8.0),
+                    Button(child: Text(lang.btn_boot), onPressed: () => WSAUtils.launch())
+                  ] else if (connectionStatus.type == ConnectionStatus.UNAUTHORIZED) ...[
+                    const SizedBox(height: 8.0),
+                    Wrap(spacing: 10.0, children: [
+                      Button(child: Text(lang.btn_auth), onPressed: () => WSAPeriodicConnector.reconnect()),
+                      Button(child: Text(lang.btn_dev_settings), onPressed: () => WSAUtils.launchDeveloperSettings())
+                    ])
+                  ],
                 ],
-              ]),
+              ),
               isLong: true,
               severity: connectionStatus.severity,
-              action: () {
-                // Do nothing for now
-              }(),
+              action: connectionStatus.type == ConnectionStatus.OFFLINE
+                  ? Wrap(spacing: 10.0, children: [
+                      Button(
+                        child: Text(lang.btn_open_wsa_settings),
+                        onPressed: () => WSAUtils.launchWsaSettings(),
+                      ),
+                      Button(
+                        child: Text(lang.btn_retry_connection),
+                        onPressed: () => WSAPeriodicConnector.reconnect(),
+                      ),
+                    ])
+                  : null,
             )
           ),
           const SizedBox(height: 20),

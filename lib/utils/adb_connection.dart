@@ -7,6 +7,14 @@ enum AdbConnectOutcome {
   failed,
 }
 
+/// Whether an ADB transport state should trigger an explicit WSA reconnect.
+/// An endpoint reported as offline can be a stale transport left by a WSA
+/// restart; merely keeping it selected does not restore the ADB connection.
+bool shouldReconnectWsaAdbEndpoint(String state) {
+  final normalized = state.trim().toLowerCase();
+  return normalized == 'offline' || normalized == 'host';
+}
+
 AdbConnectOutcome classifyAdbConnectOutcome({
   required int exitCode,
   required String stdout,
